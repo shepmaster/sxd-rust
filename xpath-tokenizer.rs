@@ -96,19 +96,19 @@ impl XPathTokenizer {
 
     fn valid_ncname_start_char(& self, offset: uint) -> bool {
         let c = self.xpath[offset];
-        if (c >= 'A' && c <= 'Z') { return true }
-        if (c == '_') { return true }
-        if (c >= 'a' && c <= 'z') { return true }
+        if c >= 'A' && c <= 'Z' { return true }
+        if c == '_' { return true }
+        if c >= 'a' && c <= 'z' { return true }
         // TODO: All non-ASCII codepoints
         return false;
     }
 
     fn valid_ncname_follow_char(& self, offset: uint) -> bool {
         let c = self.xpath[offset];
-        if (self.valid_ncname_start_char(offset)) { return true }
-        if (c == '-') { return true }
-        if (c == '.') { return true }
-        if (c >= '0' && c <= '9') { return true }
+        if self.valid_ncname_start_char(offset) { return true }
+        if c == '-' { return true }
+        if c == '.' { return true }
+        if c >= '0' && c <= '9' { return true }
         // TODO: All non-ASCII codepoints
         return false;
     }
@@ -117,10 +117,10 @@ impl XPathTokenizer {
     fn while_valid_string(& self, offset: uint) -> uint {
         let mut offset = offset;
 
-        if (self.valid_ncname_start_char(offset)) {
+        if self.valid_ncname_start_char(offset) {
             offset += 1;
 
-            while (offset < self.xpath.len() && self.valid_ncname_follow_char(offset)) {
+            while offset < self.xpath.len() && self.valid_ncname_follow_char(offset) {
                 offset += 1;
             }
         }
@@ -195,7 +195,7 @@ impl XPathTokenizer {
         offset = self.while_not_character(offset, quote_char);
         let end_of_string = offset;
 
-        if (self.xpath[offset] != quote_char) {
+        if self.xpath[offset] != quote_char {
             fail!("throw MismatchedQuoteCharacterException(quote_char)");
         }
         offset += 1; // Skip over ending quote
@@ -235,13 +235,13 @@ impl XPathTokenizer {
             }
         }
 
-        if ('.' == c && ! is_digit(self.xpath[self.start + 1])) {
+        if '.' == c && ! is_digit(self.xpath[self.start + 1]) {
             // Ugly. Should we use START / FOLLOW constructs?
             self.start += 1;
             return CurrentNode;
         }
 
-        if (is_number_char(c)) {
+        if is_number_char(c) {
             let mut offset = self.start;
             let current_start = self.start;
 
@@ -257,27 +257,26 @@ impl XPathTokenizer {
             let mut offset = self.start;
             let current_start = self.start;
 
-            if (self.prefer_recognition_of_operator_names) {
+            if self.prefer_recognition_of_operator_names {
                 for &(ref name, ref token) in self.named_operators().iter() {
-
                     let name_chars: Vec<char> = name.chars().collect();
                     let name_chars_slice = name_chars.as_slice();
                     let xpath_chars = self.xpath.slice(offset, offset + name_chars.len());
 
-                    if (name_chars_slice == xpath_chars) {
+                    if name_chars_slice == xpath_chars {
                         self.start += name_chars.len();
                         return token.clone();
                     }
                 }
             }
 
-            if (self.xpath[offset] == '*') {
+            if self.xpath[offset] == '*' {
                 self.start = offset + 1;
                 return String("*".to_string());
             }
 
             offset = self.while_valid_string(offset);
-            if (self.xpath[offset] == ':' && self.xpath[offset + 1] != ':') {
+            if self.xpath[offset] == ':' && self.xpath[offset + 1] != ':' {
                 let prefix = self.substr(current_start, offset);
 
                 offset += 1;
@@ -285,7 +284,7 @@ impl XPathTokenizer {
                 let current_start = offset;
                 offset = self.while_valid_string(offset);
 
-                if (current_start == offset) {
+                if current_start == offset {
                     fail!("throw MissingLocalNameException()");
                 }
 
@@ -304,7 +303,7 @@ impl XPathTokenizer {
         while self.start < self.xpath.len() {
             let c = self.xpath[self.start];
 
-            if (! is_xml_space(c)) {
+            if ! is_xml_space(c) {
                 break;
             }
 
@@ -315,22 +314,22 @@ impl XPathTokenizer {
     pub fn next_token(& mut self) -> XPathToken {
         self.consume_whitespace();
 
-        if (! self.has_more_tokens()) {
+        if ! self.has_more_tokens() {
             fail!("throw NoMoreTokensAvailableException()");
         }
 
         let old_start = self.start;
         let token = self.raw_next_token();
 
-        if (old_start == self.start) {
+        if old_start == self.start {
             fail!("throw UnableToCreateTokenException()");
         }
 
         self.consume_whitespace();
 
-        if (! (token.precedes_node_test() ||
-               token.precedes_expression() ||
-               token.is_operator())) {
+        if ! (token.precedes_node_test() ||
+              token.precedes_expression() ||
+              token.is_operator()) {
             // See http://www.w3.org/TR/xpath/#exprlex
             self.prefer_recognition_of_operator_names = true;
         } else {
@@ -340,7 +339,6 @@ impl XPathTokenizer {
     }
 }
 
-
 fn is_xml_space(c: char) -> bool {
     return
         c == ' '  ||
@@ -349,14 +347,15 @@ fn is_xml_space(c: char) -> bool {
         c == '\r';
 }
 
-
 fn is_number_char(c: char) -> bool {
     return is_digit(c) || '.' == c;
+}
+
+fn main() {
+    let mut tzer = XPathTokenizer::new("//foo");
+    println!("Hi! {}", tzer.next_token());
 }
 
 // broken nesting double in single
 // open paren / suqre brace causes indent
 static QUOTE_CHARS: [char, .. 2] =  ['\'', '"'];
-
-fn main() {
-    }
