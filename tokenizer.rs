@@ -2,7 +2,7 @@ use std::collections::hashmap::HashMap;
 use std::char::is_digit;
 
 #[deriving(PartialEq,Show,Clone)]
-enum XPathToken {
+pub enum XPathToken {
     And,
     AtSign,
     CurrentNode,
@@ -74,15 +74,14 @@ impl XPathToken {
     }
 }
 
-
-struct XPathTokenizer {
+pub struct XPathTokenizer {
     xpath: Vec<char>,
     start: uint,
     prefer_recognition_of_operator_names: bool,
 }
 
 impl XPathTokenizer {
-    fn new(xpath: & str) -> XPathTokenizer {
+    pub fn new(xpath: & str) -> XPathTokenizer {
         XPathTokenizer {
             xpath: xpath.chars().collect(),
             start: 0,
@@ -90,7 +89,7 @@ impl XPathTokenizer {
         }
     }
 
-    fn has_more_tokens(& self) -> bool {
+    pub fn has_more_tokens(& self) -> bool {
         self.xpath.len() > self.start
     }
 
@@ -113,7 +112,6 @@ impl XPathTokenizer {
         return false;
     }
 
-
     fn while_valid_string(& self, offset: uint) -> uint {
         let mut offset = offset;
 
@@ -127,7 +125,6 @@ impl XPathTokenizer {
 
         return offset;
     }
-
 
     fn while_valid_number(& self, offset: uint) -> uint {
         let mut offset = offset;
@@ -210,17 +207,18 @@ impl XPathTokenizer {
     }
 
     fn raw_next_token(& mut self) -> XPathToken {
-        let first_two = self.substr(self.start, self.start + 2);
-        let c = self.xpath[self.start];
-
-        match self.two_char_tokens().find(&first_two) {
-            Some(token) => {
-                self.start += 2;
-                return token.clone();
+        if self.xpath.len() >= self.start + 2 {
+            let first_two = self.substr(self.start, self.start + 2);
+            match self.two_char_tokens().find(&first_two) {
+                Some(token) => {
+                    self.start += 2;
+                    return token.clone();
+                }
+                _ => {}
             }
-            _ => {}
         }
 
+        let c = self.xpath[self.start];
         match self.single_char_tokens().find(&c) {
             Some(token) => {
                 self.start += 1;
@@ -235,10 +233,15 @@ impl XPathTokenizer {
             }
         }
 
-        if '.' == c && ! is_digit(self.xpath[self.start + 1]) {
-            // Ugly. Should we use START / FOLLOW constructs?
-            self.start += 1;
-            return CurrentNode;
+        if '.' == c {
+            let has_more_chars = self.xpath.len() > self.start + 1;
+
+            if ! has_more_chars ||
+                has_more_chars && ! is_digit(self.xpath[self.start + 1]) {
+                    // Ugly. Should we use START / FOLLOW constructs?
+                    self.start += 1;
+                    return CurrentNode;
+                }
         }
 
         if is_number_char(c) {
@@ -261,11 +264,14 @@ impl XPathTokenizer {
                 for &(ref name, ref token) in self.named_operators().iter() {
                     let name_chars: Vec<char> = name.chars().collect();
                     let name_chars_slice = name_chars.as_slice();
-                    let xpath_chars = self.xpath.slice(offset, offset + name_chars.len());
 
-                    if name_chars_slice == xpath_chars {
-                        self.start += name_chars.len();
-                        return token.clone();
+                    if self.xpath.len() >= offset + name_chars.len() {
+                        let xpath_chars = self.xpath.slice(offset, offset + name_chars.len());
+
+                        if name_chars_slice == xpath_chars {
+                            self.start += name_chars.len();
+                            return token.clone();
+                        }
                     }
                 }
             }
@@ -276,7 +282,8 @@ impl XPathTokenizer {
             }
 
             offset = self.while_valid_string(offset);
-            if self.xpath[offset] == ':' && self.xpath[offset + 1] != ':' {
+            if self.xpath.len() >= offset + 2 &&
+                self.xpath[offset] == ':' && self.xpath[offset + 1] != ':' {
                 let prefix = self.substr(current_start, offset);
 
                 offset += 1;
@@ -349,11 +356,6 @@ fn is_xml_space(c: char) -> bool {
 
 fn is_number_char(c: char) -> bool {
     return is_digit(c) || '.' == c;
-}
-
-fn main() {
-    let mut tzer = XPathTokenizer::new("//foo");
-    println!("Hi! {}", tzer.next_token());
 }
 
 // broken nesting double in single
