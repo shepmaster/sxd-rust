@@ -80,6 +80,8 @@ pub struct XPathTokenizer {
     prefer_recognition_of_operator_names: bool,
 }
 
+pub type TokenResult = Result<XPathToken, & 'static str>;
+
 impl XPathTokenizer {
     pub fn new(xpath: & str) -> XPathTokenizer {
         XPathTokenizer {
@@ -318,18 +320,15 @@ impl XPathTokenizer {
         }
     }
 
-    fn next_token(& mut self) -> XPathToken {
+    fn next_token(& mut self) -> TokenResult {
         self.consume_whitespace();
-
-        if ! self.has_more_tokens() {
-            fail!("throw NoMoreTokensAvailableException()");
-        }
 
         let old_start = self.start;
         let token = self.raw_next_token();
 
+
         if old_start == self.start {
-            fail!("throw UnableToCreateTokenException()");
+            return Err("Unable to create a token");
         }
 
         self.consume_whitespace();
@@ -342,12 +341,13 @@ impl XPathTokenizer {
         } else {
             self.prefer_recognition_of_operator_names = false;
         }
-        return token;
+
+        return Ok(token);
     }
 }
 
-impl Iterator<XPathToken> for XPathTokenizer {
-    fn next(&mut self) -> Option<XPathToken> {
+impl Iterator<TokenResult> for XPathTokenizer {
+    fn next(&mut self) -> Option<TokenResult> {
         if self.has_more_tokens() {
             Some(self.next_token())
         } else {
