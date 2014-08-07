@@ -37,11 +37,7 @@ fn is_finished(tokenizer: & XPathTokenizer) -> bool {
 }
 
 fn all_tokens(tokenizer: & mut XPathTokenizer) -> Vec<XPathToken> {
-    let mut v = Vec::new();
-    while tokenizer.has_more_tokens() {
-        v.push(tokenizer.next_token());
-    }
-    v
+    tokenizer.collect()
 }
 
 #[test]

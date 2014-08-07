@@ -318,7 +318,7 @@ impl XPathTokenizer {
         }
     }
 
-    pub fn next_token(& mut self) -> XPathToken {
+    fn next_token(& mut self) -> XPathToken {
         self.consume_whitespace();
 
         if ! self.has_more_tokens() {
@@ -343,6 +343,16 @@ impl XPathTokenizer {
             self.prefer_recognition_of_operator_names = false;
         }
         return token;
+    }
+}
+
+impl Iterator<XPathToken> for XPathTokenizer {
+    fn next(&mut self) -> Option<XPathToken> {
+        if self.has_more_tokens() {
+            Some(self.next_token())
+        } else {
+            None
+        }
     }
 }
 
