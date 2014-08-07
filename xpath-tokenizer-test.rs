@@ -1,37 +1,70 @@
-#[cfg(test)]
-mod tests {
+extern crate xpath;
 
-impl XPathTokenizer {
-    fn is_finished(& self) -> bool {
-        ! self.has_more_tokens()
-    }
+use xpath::tokenizer::XPathToken;
+use xpath::tokenizer::And;
+use xpath::tokenizer::AtSign;
+use xpath::tokenizer::CurrentNode;
+use xpath::tokenizer::Divide;
+use xpath::tokenizer::DollarSign;
+use xpath::tokenizer::DoubleColon;
+use xpath::tokenizer::DoubleSlash;
+use xpath::tokenizer::Equal;
+use xpath::tokenizer::GreaterThan;
+use xpath::tokenizer::GreaterThanOrEqual;
+use xpath::tokenizer::LeftBracket;
+use xpath::tokenizer::LeftParen;
+use xpath::tokenizer::LessThan;
+use xpath::tokenizer::LessThanOrEqual;
+use xpath::tokenizer::Literal;
+use xpath::tokenizer::MinusSign;
+use xpath::tokenizer::Multiply;
+use xpath::tokenizer::NotEqual;
+use xpath::tokenizer::Number;
+use xpath::tokenizer::Or;
+use xpath::tokenizer::ParentNode;
+use xpath::tokenizer::Pipe;
+use xpath::tokenizer::PlusSign;
+use xpath::tokenizer::PrefixedName;
+use xpath::tokenizer::Remainder;
+use xpath::tokenizer::RightBracket;
+use xpath::tokenizer::RightParen;
+use xpath::tokenizer::Slash;
+use xpath::tokenizer::String;
+use xpath::tokenizer::XPathTokenizer;
 
-    fn all_tokens(& self) -> Vec<XPathToken> {
-        vec!()
+fn is_finished(tokenizer: & XPathTokenizer) -> bool {
+    ! tokenizer.has_more_tokens()
+}
+
+fn all_tokens(tokenizer: & mut XPathTokenizer) -> Vec<XPathToken> {
+    let mut v = Vec::new();
+    while tokenizer.has_more_tokens() {
+        v.push(tokenizer.next_token());
     }
+    v
 }
 
 #[test]
 fn empty_string_has_no_tokens()
 {
-    let tokenizer = XPathTokenizer::new("");
-    assert!(tokenizer.is_finished());
+    let tokenizer = xpath::tokenizer::XPathTokenizer::new("");
+    assert!(is_finished(&tokenizer));
 }
 
 #[test]
 fn tokenizes_simple_string()
 {
-    let tokenizer = XPathTokenizer::new("hello");
+    let mut tokenizer = XPathTokenizer::new("hello");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(String("hello".to_string())));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(String("hello".to_string())));
 }
 
 #[test]
 fn tokenizes_grandchild_selector()
 {
-    let tokenizer = XPathTokenizer::new("hello/world");
+    let mut tokenizer = XPathTokenizer::new("hello/world");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(String("hello".to_string()),
+    assert_eq!(all_tokens(& mut tokenizer), vec!(String("hello".to_string()),
                                            Slash,
                                            String("world".to_string())));
 }
@@ -39,9 +72,9 @@ fn tokenizes_grandchild_selector()
 #[test]
 fn tokenizes_great_grandchild_selector()
 {
-    let tokenizer = XPathTokenizer::new("hello/there/world");
+    let mut tokenizer = XPathTokenizer::new("hello/there/world");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(String("hello".to_string()),
+    assert_eq!(all_tokens(& mut tokenizer), vec!(String("hello".to_string()),
                                            Slash,
                                            String("there".to_string()),
                                            Slash,
@@ -51,17 +84,17 @@ fn tokenizes_great_grandchild_selector()
 #[test]
 fn tokenizes_qualified_names()
 {
-    let tokenizer = XPathTokenizer::new("ns:foo");
+    let mut tokenizer = XPathTokenizer::new("ns:foo");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(PrefixedName("ns".to_string(), "foo".to_string())));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(PrefixedName("ns".to_string(), "foo".to_string())));
 }
 
 #[test]
 fn ignores_whitespace_around_tokens()
 {
-    let tokenizer = XPathTokenizer::new(" @\t@\n@\r");
+    let mut tokenizer = XPathTokenizer::new(" @\t@\n@\r");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(AtSign,
+    assert_eq!(all_tokens(& mut tokenizer), vec!(AtSign,
                                            AtSign,
                                            AtSign));
 }
@@ -69,25 +102,25 @@ fn ignores_whitespace_around_tokens()
 #[test]
 fn tokenizes_wildcard_name_test()
 {
-    let tokenizer = XPathTokenizer::new("*");
+    let mut tokenizer = XPathTokenizer::new("*");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(String("*".to_string())));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(String("*".to_string())));
 }
 
 #[test]
 fn tokenizes_axis_separator()
 {
-    let tokenizer = XPathTokenizer::new("::");
+    let mut tokenizer = XPathTokenizer::new("::");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(DoubleColon));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(DoubleColon));
 }
 
 #[test]
 fn tokenizes_axis_selector()
 {
-    let tokenizer = XPathTokenizer::new("hello::world");
+    let mut tokenizer = XPathTokenizer::new("hello::world");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(String("hello".to_string()),
+    assert_eq!(all_tokens(& mut tokenizer), vec!(String("hello".to_string()),
                                            DoubleColon,
                                            String("world".to_string())));
 }
@@ -95,25 +128,25 @@ fn tokenizes_axis_selector()
 #[test]
 fn tokenizes_single_slash()
 {
-    let tokenizer = XPathTokenizer::new("/");
+    let mut tokenizer = XPathTokenizer::new("/");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(Slash));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(Slash));
 }
 
 #[test]
 fn tokenizes_double_slash()
 {
-    let tokenizer = XPathTokenizer::new("//");
+    let mut tokenizer = XPathTokenizer::new("//");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(DoubleSlash));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(DoubleSlash));
 }
 
 #[test]
 fn tokenizes_double_slash_separator()
 {
-    let tokenizer = XPathTokenizer::new("hello//world");
+    let mut tokenizer = XPathTokenizer::new("hello//world");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(String("hello".to_string()),
+    assert_eq!(all_tokens(& mut tokenizer), vec!(String("hello".to_string()),
                                            DoubleSlash,
                                            String("world".to_string())));
 }
@@ -121,185 +154,185 @@ fn tokenizes_double_slash_separator()
 #[test]
 fn tokenizes_left_paren()
 {
-    let tokenizer = XPathTokenizer::new("(");
+    let mut tokenizer = XPathTokenizer::new("(");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(LeftParen));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(LeftParen));
 }
 
 #[test]
 fn tokenizes_right_paren()
 {
-    let tokenizer = XPathTokenizer::new(")");
+    let mut tokenizer = XPathTokenizer::new(")");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(RightParen));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(RightParen));
 }
 
 #[test]
 fn tokenizes_at_sign()
 {
-    let tokenizer = XPathTokenizer::new("@");
+    let mut tokenizer = XPathTokenizer::new("@");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(AtSign));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(AtSign));
 }
 
 #[test]
 fn tokenizes_single_dot()
 {
-    let tokenizer = XPathTokenizer::new(".");
+    let mut tokenizer = XPathTokenizer::new(".");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(CurrentNode));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(CurrentNode));
 }
 
 #[test]
 fn tokenizes_double_dot()
 {
-    let tokenizer = XPathTokenizer::new("..");
+    let mut tokenizer = XPathTokenizer::new("..");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(ParentNode));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(ParentNode));
 }
 
 #[test]
 fn tokenizes_integral_number()
 {
-    let tokenizer = XPathTokenizer::new("42");
+    let mut tokenizer = XPathTokenizer::new("42");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(Number(42.0)));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(Number(42.0)));
 }
 
 #[test]
 fn tokenizes_decimal_number()
 {
-    let tokenizer = XPathTokenizer::new("42.42");
+    let mut tokenizer = XPathTokenizer::new("42.42");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(Number(42.42)));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(Number(42.42)));
 }
 
 #[test]
 fn tokenizes_decimal_number_without_integral_part()
 {
-    let tokenizer = XPathTokenizer::new(".42");
+    let mut tokenizer = XPathTokenizer::new(".40");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(Number(0.42)));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(Number(0.40)));
 }
 
 #[test]
 fn tokenizes_left_bracket()
 {
-    let tokenizer = XPathTokenizer::new("[");
+    let mut tokenizer = XPathTokenizer::new("[");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(LeftBracket));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(LeftBracket));
 }
 
 #[test]
 fn tokenizes_right_bracket()
 {
-    let tokenizer = XPathTokenizer::new("]");
+    let mut tokenizer = XPathTokenizer::new("]");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(RightBracket));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(RightBracket));
 }
 
 #[test]
 fn tokenizes_apostrophe_literal()
 {
-    let tokenizer = XPathTokenizer::new("'hello!'");
+    let mut tokenizer = XPathTokenizer::new("'hello!'");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(Literal("hello!".to_string())));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(Literal("hello!".to_string())));
 }
 
 #[test]
 fn tokenizes_double_quote_literal()
 {
-    let tokenizer = XPathTokenizer::new("\"1.23\"");
+    let mut tokenizer = XPathTokenizer::new("\"1.23\"");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(Literal("1.23".to_string())));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(Literal("1.23".to_string())));
 }
 
 #[test]
 fn tokenizes_dollar_sign()
 {
-    let tokenizer = XPathTokenizer::new("$");
+    let mut tokenizer = XPathTokenizer::new("$");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(DollarSign));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(DollarSign));
 }
 
 #[test]
 fn tokenizes_plus_sign()
 {
-    let tokenizer = XPathTokenizer::new("+");
+    let mut tokenizer = XPathTokenizer::new("+");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(PlusSign));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(PlusSign));
 }
 
 #[test]
 fn tokenizes_minus_sign()
 {
-    let tokenizer = XPathTokenizer::new("-");
+    let mut tokenizer = XPathTokenizer::new("-");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(MinusSign));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(MinusSign));
 }
 
 #[test]
 fn tokenizes_pipe()
 {
-    let tokenizer = XPathTokenizer::new("|");
+    let mut tokenizer = XPathTokenizer::new("|");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(Pipe));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(Pipe));
 }
 
 #[test]
 fn tokenizes_equal_sign()
 {
-    let tokenizer = XPathTokenizer::new("=");
+    let mut tokenizer = XPathTokenizer::new("=");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(Equal));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(Equal));
 }
 
 #[test]
 fn tokenizes_not_equal_sign()
 {
-    let tokenizer = XPathTokenizer::new("!=");
+    let mut tokenizer = XPathTokenizer::new("!=");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(NotEqual));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(NotEqual));
 }
 
 #[test]
 fn tokenizes_less_than()
 {
-    let tokenizer = XPathTokenizer::new("<");
+    let mut tokenizer = XPathTokenizer::new("<");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(LessThan));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(LessThan));
 }
 
 #[test]
 fn tokenizes_less_than_or_equal()
 {
-    let tokenizer = XPathTokenizer::new("<=");
+    let mut tokenizer = XPathTokenizer::new("<=");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(LessThanOrEqual));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(LessThanOrEqual));
 }
 
 #[test]
 fn tokenizes_greater_than()
 {
-    let tokenizer = XPathTokenizer::new(">");
+    let mut tokenizer = XPathTokenizer::new(">");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(GreaterThan));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(GreaterThan));
 }
 
 #[test]
 fn tokenizes_greater_than_or_equal()
 {
-    let tokenizer = XPathTokenizer::new(">=");
+    let mut tokenizer = XPathTokenizer::new(">=");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(GreaterThanOrEqual));
+    assert_eq!(all_tokens(& mut tokenizer), vec!(GreaterThanOrEqual));
 }
 
 #[test]
 fn special_preceding_token_forces_named_operator_and()
 {
-    let tokenizer = XPathTokenizer::new("1andz2");
+    let mut tokenizer = XPathTokenizer::new("1andz2");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(Number(1.0),
+    assert_eq!(all_tokens(& mut tokenizer), vec!(Number(1.0),
                                            And,
                                            String("z2".to_string())));
 }
@@ -307,9 +340,9 @@ fn special_preceding_token_forces_named_operator_and()
 #[test]
 fn special_preceding_token_forces_named_operator_or()
 {
-    let tokenizer = XPathTokenizer::new("2oror");
+    let mut tokenizer = XPathTokenizer::new("2oror");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(Number(2.0),
+    assert_eq!(all_tokens(& mut tokenizer), vec!(Number(2.0),
                                            Or,
                                            String("or".to_string())));
 }
@@ -317,9 +350,9 @@ fn special_preceding_token_forces_named_operator_or()
 #[test]
 fn special_preceding_token_forces_named_operator_mod()
 {
-    let tokenizer = XPathTokenizer::new("3moddiv");
+    let mut tokenizer = XPathTokenizer::new("3moddiv");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(Number(3.0),
+    assert_eq!(all_tokens(& mut tokenizer), vec!(Number(3.0),
                                            Remainder,
                                            String("div".to_string())));
 }
@@ -327,9 +360,9 @@ fn special_preceding_token_forces_named_operator_mod()
 #[test]
 fn special_preceding_token_forces_named_operator_div()
 {
-    let tokenizer = XPathTokenizer::new("1divz2");
+    let mut tokenizer = XPathTokenizer::new("1divz2");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(Number(1.0),
+    assert_eq!(all_tokens(& mut tokenizer), vec!(Number(1.0),
                                            Divide,
                                            String("z2".to_string())));
 }
@@ -337,9 +370,9 @@ fn special_preceding_token_forces_named_operator_div()
 #[test]
 fn special_preceding_token_forces_named_operator_multiply()
 {
-    let tokenizer = XPathTokenizer::new("1*2");
+    let mut tokenizer = XPathTokenizer::new("1*2");
 
-    assert_eq!(tokenizer.all_tokens(), vec!(Number(1.0),
+    assert_eq!(all_tokens(& mut tokenizer), vec!(Number(1.0),
                                            Multiply,
                                            Number(2.0)));
 }
@@ -348,7 +381,7 @@ fn special_preceding_token_forces_named_operator_multiply()
 fn exception_thrown_when_no_more_tokens_available()
 {
     fail!("unimplemented")
-    // let tokenizer = XPathTokenizer::new("");
+    // let mut tokenizer = XPathTokenizer::new("");
 
     // ASSERT_THROW(tokenizer.next_token(), NoMoreTokensAvailableException);
 }
@@ -357,7 +390,7 @@ fn exception_thrown_when_no_more_tokens_available()
 fn exception_thrown_when_nothing_was_tokenized()
 {
     fail!("unimplemented")
-    //     let tokenizer = XPathTokenizer::new("!");
+    //     let mut tokenizer = XPathTokenizer::new("!");
 
     // ASSERT_THROW(tokenizer.next_token(), UnableToCreateTokenException);
 }
@@ -366,7 +399,7 @@ fn exception_thrown_when_nothing_was_tokenized()
 fn exception_thrown_when_name_test_has_no_local_name()
 {
     fail!("unimplemented")
-    // let tokenizer = XPathTokenizer::new("ns:");
+    // let mut tokenizer = XPathTokenizer::new("ns:");
 
     // ASSERT_THROW(tokenizer.next_token(), MissingLocalNameException);
 }
@@ -375,9 +408,7 @@ fn exception_thrown_when_name_test_has_no_local_name()
 fn exception_thrown_when_quote_characters_mismatched()
 {
     fail!("unimplemented")
-    // let tokenizer = XPathTokenizer::new("'hello\"");
+    // let mut tokenizer = XPathTokenizer::new("'hello\"");
 
     // ASSERT_THROW(tokenizer.next_token(), MismatchedQuoteCharacterException);
-}
-
 }
