@@ -91,9 +91,18 @@ impl XPathTokenizer {
         }
     }
 
-    pub fn has_more_tokens(& self) -> bool {
-        self.xpath.len() > self.start
+
+
+    fn str_at_is(& self, offset: uint, needle: &[char]) -> bool {
+        let s_len = needle.len();
+
+        if self.xpath.len() < offset + s_len { return false; }
+
+        let xpath_chars = self.xpath.slice(offset, offset + s_len);
+
+        needle == xpath_chars
     }
+
 
     fn valid_ncname_start_char(& self, offset: uint) -> bool {
         let c = self.xpath[offset];
@@ -146,6 +155,66 @@ impl XPathTokenizer {
         }
 
         return offset;
+    }
+
+
+    fn substr(& self, start: uint, end: uint) -> String {
+        String::from_chars(self.xpath.slice(start, end))
+    }
+
+    fn safe_substr(& self, start: uint, end: uint) -> Option<String> {
+        if self.xpath.len() >= end {
+            Some(self.substr(start, end))
+        } else {
+            None
+        }
+    }
+
+    fn char_at(&self, offset: uint) -> char {
+        self.xpath[offset]
+    }
+
+    fn char_at_is(&self, offset: uint, c: char) -> bool {
+        let has_one_more = self.xpath.len() >= offset + 1;
+
+        has_one_more && self.xpath[offset] == c
+    }
+
+    fn char_at_is_not(&self, offset: uint, c: char) -> bool {
+        let has_one_more = self.xpath.len() >= offset + 1;
+
+        ! has_one_more || self.xpath[offset] != c
+    }
+
+    fn char_at_is_not_digit(& self, offset: uint) -> bool {
+        let has_more_chars = self.xpath.len() >= offset + 1;
+
+        ! has_more_chars || ! is_digit(self.xpath[offset])
+    }
+
+    fn end_of_whitespace(& self, offset: uint) -> uint {
+        let mut offset = offset;
+
+        while offset < self.xpath.len() {
+            let c = self.xpath[offset];
+
+            if ! is_xml_space(c) {
+                break;
+            }
+
+            offset += 1;
+        }
+
+        offset
+    }
+
+
+
+
+
+
+    pub fn has_more_tokens(& self) -> bool {
+        self.xpath.len() > self.start
     }
 
     fn two_char_tokens(& self) -> HashMap<String, XPathToken> {
@@ -203,55 +272,8 @@ impl XPathTokenizer {
         return Ok(Literal(self.substr(start_of_string, end_of_string)));
     }
 
-    fn substr(& self, start: uint, end: uint) -> String {
-        String::from_chars(self.xpath.slice(start, end))
-    }
-
-    fn first_two(& self) -> Option<String> {
-        if self.xpath.len() >= self.start + 2 {
-            Some(self.substr(self.start, self.start + 2))
-        } else {
-            None
-        }
-    }
-
-    fn first(& self) -> char {
-        self.xpath[self.start]
-    }
-
-
-    fn next_char_is_digit(& self) -> bool {
-        let has_more_chars = self.xpath.len() > self.start + 1;
-
-        ! has_more_chars ||
-            has_more_chars && ! is_digit(self.xpath[self.start + 1])
-    }
-
-
-    fn str_at_is(& self, offset: uint, needle: &[char]) -> bool {
-        let s_len = needle.len();
-
-        if self.xpath.len() < offset + s_len { return false; }
-
-        let xpath_chars = self.xpath.slice(offset, offset + s_len);
-
-        needle == xpath_chars
-    }
-
-    fn char_at_is(&self, offset: uint, c: char) -> bool {
-        let has_one_more = self.xpath.len() >= offset + 1;
-
-        has_one_more && self.xpath[offset] == c
-    }
-
-    fn char_at_is_not(&self, offset: uint, c: char) -> bool {
-        let has_one_more = self.xpath.len() >= offset + 1;
-
-        ! has_one_more || self.xpath[offset] != c
-    }
-
     fn raw_next_token(& mut self) -> Result<XPathToken, & 'static str> {
-        match self.first_two() {
+        match self.safe_substr(self.start, self.start + 2) {
             Some(first_two) => {
                 match self.two_char_tokens().find(&first_two) {
                     Some(token) => {
@@ -264,7 +286,8 @@ impl XPathTokenizer {
             _ => {}
         }
 
-        let c = self.first();
+        let c = self.char_at(self.start);
+
         match self.single_char_tokens().find(&c) {
             Some(token) => {
                 self.start += 1;
@@ -280,7 +303,7 @@ impl XPathTokenizer {
         }
 
         if '.' == c {
-            if self.next_char_is_digit() {
+            if self.char_at_is_not_digit(self.start + 1) {
                 // Ugly. Should we use START / FOLLOW constructs?
                 self.start += 1;
                 return Ok(CurrentNode);
@@ -347,15 +370,7 @@ impl XPathTokenizer {
     }
 
     fn consume_whitespace(& mut self) {
-        while self.start < self.xpath.len() {
-            let c = self.xpath[self.start];
-
-            if ! is_xml_space(c) {
-                break;
-            }
-
-            self.start += 1;
-        }
+        self.start = self.end_of_whitespace(self.start);
     }
 
     fn next_token(& mut self) -> TokenResult {
@@ -389,10 +404,7 @@ impl XPathTokenizer {
 impl Iterator<TokenResult> for XPathTokenizer {
     fn next(&mut self) -> Option<TokenResult> {
         if self.has_more_tokens() {
-            let x = Some(self.next_token());
-            println!("return {}", x);
-            x
-
+            Some(self.next_token())
         } else {
             None
         }
