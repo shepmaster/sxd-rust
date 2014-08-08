@@ -393,17 +393,19 @@ fn exception_thrown_when_nothing_was_tokenized()
 #[test]
 fn exception_thrown_when_name_test_has_no_local_name()
 {
-    fail!("unimplemented")
-    // let tokenizer = XPathTokenizer::new("ns:");
+    let tokenizer = XPathTokenizer::new("ns:");
+    let res = all_tokens_raw(tokenizer);
 
-    // ASSERT_THROW(tokenizer.next_token(), MissingLocalNameException);
+    assert!(res.is_err());
+    assert!(res.unwrap_err().contains("missing a local name"));
 }
 
 #[test]
 fn exception_thrown_when_quote_characters_mismatched()
 {
-    fail!("unimplemented")
-    // let tokenizer = XPathTokenizer::new("'hello\"");
+    let tokenizer = XPathTokenizer::new("'hello\"");
+    let res = all_tokens_raw(tokenizer);
 
-    // ASSERT_THROW(tokenizer.next_token(), MismatchedQuoteCharacterException);
+    assert!(res.is_err());
+    assert!(res.unwrap_err().contains("mismatched quote characters"));
 }

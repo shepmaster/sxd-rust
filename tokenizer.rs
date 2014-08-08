@@ -117,7 +117,7 @@ impl XPathTokenizer {
     fn while_valid_string(& self, offset: uint) -> uint {
         let mut offset = offset;
 
-        if self.valid_ncname_start_char(offset) {
+        if offset < self.xpath.len() && self.valid_ncname_start_char(offset) {
             offset += 1;
 
             while offset < self.xpath.len() && self.valid_ncname_follow_char(offset) {
@@ -185,7 +185,7 @@ impl XPathTokenizer {
              ("*",   Multiply))
     }
 
-    fn tokenize_literal(& mut self, quote_char: char) -> XPathToken {
+    fn tokenize_literal(& mut self, quote_char: char) -> Result<XPathToken, & 'static str> {
         let mut offset = self.start;
 
         offset += 1; // Skip over the starting quote
@@ -194,27 +194,27 @@ impl XPathTokenizer {
         offset = self.while_not_character(offset, quote_char);
         let end_of_string = offset;
 
-        if self.xpath[offset] != quote_char {
-            fail!("throw MismatchedQuoteCharacterException(quote_char)");
+        if offset >= self.xpath.len() || self.xpath[offset] != quote_char {
+            return Err("found mismatched quote characters");
         }
         offset += 1; // Skip over ending quote
 
         self.start = offset;
         let value = self.xpath.slice(start_of_string, end_of_string);
-        return Literal(String::from_chars(value));
+        return Ok(Literal(String::from_chars(value)));
     }
 
     fn substr(& self, start: uint, end: uint) -> String {
         String::from_chars(self.xpath.slice(start, end))
     }
 
-    fn raw_next_token(& mut self) -> XPathToken {
+    fn raw_next_token(& mut self) -> Result<XPathToken, & 'static str> {
         if self.xpath.len() >= self.start + 2 {
             let first_two = self.substr(self.start, self.start + 2);
             match self.two_char_tokens().find(&first_two) {
                 Some(token) => {
                     self.start += 2;
-                    return token.clone();
+                    return Ok(token.clone());
                 }
                 _ => {}
             }
@@ -224,7 +224,7 @@ impl XPathTokenizer {
         match self.single_char_tokens().find(&c) {
             Some(token) => {
                 self.start += 1;
-                return token.clone();
+                return Ok(token.clone());
             }
             _ => {}
         }
@@ -242,7 +242,7 @@ impl XPathTokenizer {
                 has_more_chars && ! is_digit(self.xpath[self.start + 1]) {
                     // Ugly. Should we use START / FOLLOW constructs?
                     self.start += 1;
-                    return CurrentNode;
+                    return Ok(CurrentNode);
                 }
         }
 
@@ -255,7 +255,7 @@ impl XPathTokenizer {
             self.start = offset;
             let substr = self.substr(current_start, offset);
             match from_str(substr.as_slice()) {
-                Some(value) => Number(value),
+                Some(value) => Ok(Number(value)),
                 None => fail!("Not really a number!")
             }
         } else {
@@ -272,7 +272,7 @@ impl XPathTokenizer {
 
                         if name_chars_slice == xpath_chars {
                             self.start += name_chars.len();
-                            return token.clone();
+                            return Ok(token.clone());
                         }
                     }
                 }
@@ -280,30 +280,40 @@ impl XPathTokenizer {
 
             if self.xpath[offset] == '*' {
                 self.start = offset + 1;
-                return String("*".to_string());
+                return Ok(String("*".to_string()));
             }
 
             offset = self.while_valid_string(offset);
-            if self.xpath.len() >= offset + 2 &&
-                self.xpath[offset] == ':' && self.xpath[offset + 1] != ':' {
-                let prefix = self.substr(current_start, offset);
 
-                offset += 1;
+            println!("{}, {}", self.xpath.len(), offset);
 
-                let current_start = offset;
-                offset = self.while_valid_string(offset);
+            let has_one_more = self.xpath.len() >= offset + 1;
+            let has_two_more = self.xpath.len() >= offset + 2;
 
-                if current_start == offset {
-                    fail!("throw MissingLocalNameException()");
-                }
+            println!("{}, {}", has_one_more, has_two_more);
 
-                let name = self.substr(current_start, offset);
+            if (has_one_more && self.xpath[offset] == ':') &&
+                (! has_two_more ||
+                 (has_two_more && {println!("inner"); true} && self.xpath[offset + 1] != ':')) {
+                    let prefix = self.substr(current_start, offset);
 
-                self.start = offset;
-                return PrefixedName(prefix, name);
+                    offset += 1;
+
+                    let current_start = offset;
+                    offset = self.while_valid_string(offset);
+
+                    if current_start == offset {
+                        return Err("The XPath is missing a local name");
+                    }
+
+                    let name = self.substr(current_start, offset);
+
+                    self.start = offset;
+                    return Ok(PrefixedName(prefix, name));
+
             } else {
                 self.start = offset;
-                return String(String::from_chars(self.xpath.slice(current_start, offset)));
+                return Ok(String(String::from_chars(self.xpath.slice(current_start, offset))));
             }
         }
     }
@@ -325,7 +335,9 @@ impl XPathTokenizer {
 
         let old_start = self.start;
         let token = self.raw_next_token();
+        if token.is_err() { return token; }
 
+        let token = token.unwrap();
 
         if old_start == self.start {
             return Err("Unable to create a token");
@@ -349,7 +361,10 @@ impl XPathTokenizer {
 impl Iterator<TokenResult> for XPathTokenizer {
     fn next(&mut self) -> Option<TokenResult> {
         if self.has_more_tokens() {
-            Some(self.next_token())
+            let x = Some(self.next_token());
+            println!("return {}", x);
+            x
+
         } else {
             None
         }
