@@ -194,33 +194,77 @@ impl XPathTokenizer {
         offset = self.while_not_character(offset, quote_char);
         let end_of_string = offset;
 
-        if offset >= self.xpath.len() || self.xpath[offset] != quote_char {
+        if self.char_at_is_not(offset, quote_char) {
             return Err("found mismatched quote characters");
         }
         offset += 1; // Skip over ending quote
 
         self.start = offset;
-        let value = self.xpath.slice(start_of_string, end_of_string);
-        return Ok(Literal(String::from_chars(value)));
+        return Ok(Literal(self.substr(start_of_string, end_of_string)));
     }
 
     fn substr(& self, start: uint, end: uint) -> String {
         String::from_chars(self.xpath.slice(start, end))
     }
 
-    fn raw_next_token(& mut self) -> Result<XPathToken, & 'static str> {
+    fn first_two(& self) -> Option<String> {
         if self.xpath.len() >= self.start + 2 {
-            let first_two = self.substr(self.start, self.start + 2);
-            match self.two_char_tokens().find(&first_two) {
-                Some(token) => {
-                    self.start += 2;
-                    return Ok(token.clone());
+            Some(self.substr(self.start, self.start + 2))
+        } else {
+            None
+        }
+    }
+
+    fn first(& self) -> char {
+        self.xpath[self.start]
+    }
+
+
+    fn next_char_is_digit(& self) -> bool {
+        let has_more_chars = self.xpath.len() > self.start + 1;
+
+        ! has_more_chars ||
+            has_more_chars && ! is_digit(self.xpath[self.start + 1])
+    }
+
+
+    fn str_at_is(& self, offset: uint, needle: &[char]) -> bool {
+        let s_len = needle.len();
+
+        if self.xpath.len() < offset + s_len { return false; }
+
+        let xpath_chars = self.xpath.slice(offset, offset + s_len);
+
+        needle == xpath_chars
+    }
+
+    fn char_at_is(&self, offset: uint, c: char) -> bool {
+        let has_one_more = self.xpath.len() >= offset + 1;
+
+        has_one_more && self.xpath[offset] == c
+    }
+
+    fn char_at_is_not(&self, offset: uint, c: char) -> bool {
+        let has_one_more = self.xpath.len() >= offset + 1;
+
+        ! has_one_more || self.xpath[offset] != c
+    }
+
+    fn raw_next_token(& mut self) -> Result<XPathToken, & 'static str> {
+        match self.first_two() {
+            Some(first_two) => {
+                match self.two_char_tokens().find(&first_two) {
+                    Some(token) => {
+                        self.start += 2;
+                        return Ok(token.clone());
+                    }
+                    _ => {}
                 }
-                _ => {}
-            }
+            },
+            _ => {}
         }
 
-        let c = self.xpath[self.start];
+        let c = self.first();
         match self.single_char_tokens().find(&c) {
             Some(token) => {
                 self.start += 1;
@@ -236,14 +280,11 @@ impl XPathTokenizer {
         }
 
         if '.' == c {
-            let has_more_chars = self.xpath.len() > self.start + 1;
-
-            if ! has_more_chars ||
-                has_more_chars && ! is_digit(self.xpath[self.start + 1]) {
-                    // Ugly. Should we use START / FOLLOW constructs?
-                    self.start += 1;
-                    return Ok(CurrentNode);
-                }
+            if self.next_char_is_digit() {
+                // Ugly. Should we use START / FOLLOW constructs?
+                self.start += 1;
+                return Ok(CurrentNode);
+            }
         }
 
         if is_number_char(c) {
@@ -267,53 +308,40 @@ impl XPathTokenizer {
                     let name_chars: Vec<char> = name.chars().collect();
                     let name_chars_slice = name_chars.as_slice();
 
-                    if self.xpath.len() >= offset + name_chars.len() {
-                        let xpath_chars = self.xpath.slice(offset, offset + name_chars.len());
-
-                        if name_chars_slice == xpath_chars {
-                            self.start += name_chars.len();
-                            return Ok(token.clone());
-                        }
+                    if self.str_at_is(offset, name_chars_slice) {
+                        self.start += name_chars.len();
+                        return Ok(token.clone());
                     }
                 }
             }
 
-            if self.xpath[offset] == '*' {
+            if self.char_at_is(offset, '*') {
                 self.start = offset + 1;
                 return Ok(String("*".to_string()));
             }
 
             offset = self.while_valid_string(offset);
 
-            println!("{}, {}", self.xpath.len(), offset);
+            if self.char_at_is(offset, ':') && self.char_at_is_not(offset + 1, ':') {
+                let prefix = self.substr(current_start, offset);
 
-            let has_one_more = self.xpath.len() >= offset + 1;
-            let has_two_more = self.xpath.len() >= offset + 2;
+                offset += 1;
 
-            println!("{}, {}", has_one_more, has_two_more);
+                let current_start = offset;
+                offset = self.while_valid_string(offset);
 
-            if (has_one_more && self.xpath[offset] == ':') &&
-                (! has_two_more ||
-                 (has_two_more && {println!("inner"); true} && self.xpath[offset + 1] != ':')) {
-                    let prefix = self.substr(current_start, offset);
+                if current_start == offset {
+                    return Err("The XPath is missing a local name");
+                }
 
-                    offset += 1;
+                let name = self.substr(current_start, offset);
 
-                    let current_start = offset;
-                    offset = self.while_valid_string(offset);
-
-                    if current_start == offset {
-                        return Err("The XPath is missing a local name");
-                    }
-
-                    let name = self.substr(current_start, offset);
-
-                    self.start = offset;
-                    return Ok(PrefixedName(prefix, name));
+                self.start = offset;
+                return Ok(PrefixedName(prefix, name));
 
             } else {
                 self.start = offset;
-                return Ok(String(String::from_chars(self.xpath.slice(current_start, offset))));
+                return Ok(String(self.substr(current_start, offset)));
             }
         }
     }
