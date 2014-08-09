@@ -3,9 +3,9 @@ use super::super::XPathNodeTest;
 use super::super::Nodeset;
 use super::XPathAxis;
 
-pub struct AxisChild;
+pub struct AxisDescendant;
 
-impl XPathAxis for AxisChild {
+impl XPathAxis for AxisDescendant {
     fn select_nodes(&self,
                     context:   &XPathEvaluationContext,
                     node_test: &XPathNodeTest,
@@ -16,6 +16,7 @@ impl XPathAxis for AxisChild {
             child_context.next(child);
 
             node_test.test(&child_context, result);
+            self.select_nodes(&child_context, node_test, result);
         }
     }
 }

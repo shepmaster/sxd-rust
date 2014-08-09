@@ -8,7 +8,8 @@ use super::Attribute;
 pub struct AxisAttribute;
 
 impl XPathAxis for AxisAttribute {
-    fn select_nodes(context:   &XPathEvaluationContext,
+    fn select_nodes(&self,
+                    context:   &XPathEvaluationContext,
                     node_test: &XPathNodeTest,
                     result:    &mut Nodeset)
     {

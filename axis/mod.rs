@@ -4,6 +4,8 @@ use super::Nodeset;
 
 pub mod attribute;
 pub mod child;
+pub mod descendant;
+pub mod descendant_or_self;
 
 enum PrincipalNodeType {
   Attribute,
@@ -14,7 +16,8 @@ enum PrincipalNodeType {
 trait XPathAxis {
     /// Applies the given node test to the nodes selected by this axis,
     /// adding matching nodes to the nodeset.
-    fn select_nodes(context:   &XPathEvaluationContext,
+    fn select_nodes(&self,
+                    context:   &XPathEvaluationContext,
                     node_test: &XPathNodeTest,
                     result:    &mut Nodeset);
 
