@@ -5,6 +5,8 @@ struct Node {
     attributes: Vec<Node>,
 }
 
+struct XPathValue;
+
 struct XPathEvaluationContext<'a> {
     node: & 'a Node,
 }
@@ -51,3 +53,4 @@ pub mod tokenizer;
 pub mod deabbreviator;
 pub mod disambiguator;
 pub mod axis;
+pub mod expression;
