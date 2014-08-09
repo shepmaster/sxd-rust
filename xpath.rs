@@ -1,20 +1,27 @@
 #![crate_name = "xpath"]
 
-struct Node {
+pub struct Node {
     children: Vec<Node>,
     attributes: Vec<Node>,
 }
 
-struct XPathValue;
-
-struct XPathEvaluationContext<'a> {
-    node: & 'a Node,
+#[deriving(PartialEq,Show)]
+pub enum XPathValue {
+    Boolean(bool),
 }
 
-struct XPathNodeTest;
-struct Nodeset;
+pub struct XPathEvaluationContext<'a> {
+    pub node: & 'a Node,
+}
+
+pub struct XPathNodeTest;
+pub struct Nodeset;
 
 impl Node {
+    pub fn new() -> Node {
+        Node { children: vec!(), attributes: vec!() }
+    }
+
     fn parent(&self) -> &Node {
         self
     }
@@ -25,6 +32,14 @@ impl Node {
 
     fn attributes(&self) -> std::slice::Items<Node> {
         self.attributes.iter()
+    }
+}
+
+impl XPathValue {
+    fn boolean(&self) -> bool {
+        match *self {
+            Boolean(val) => val,
+        }
     }
 }
 

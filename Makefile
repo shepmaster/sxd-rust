@@ -1,4 +1,4 @@
-all: xpath-tokenizer-test xpath-token-deabbreviator-test xpath-token-disambiguator-test
+all: xpath-tokenizer-test xpath-token-deabbreviator-test xpath-token-disambiguator-test xpath-expression-test
 
 libxpath.rlib: xpath.rs tokenizer.rs deabbreviator.rs token.rs disambiguator.rs axis.rs expression.rs
 	rustc -g --crate-type=lib xpath.rs
@@ -12,3 +12,6 @@ xpath-token-deabbreviator-test: xpath-token-deabbreviator-test.rs libxpath.rlib
 
 xpath-token-disambiguator-test: xpath-token-disambiguator-test.rs libxpath.rlib
 	rustc -g -L . --test xpath-token-disambiguator-test.rs
+
+xpath-expression-test: xpath-expression-test.rs libxpath.rlib
+	rustc -g -L . --test xpath-expression-test.rs
