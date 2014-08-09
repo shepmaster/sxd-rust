@@ -29,6 +29,11 @@ pub enum XPathToken {
     RightParen,
     Slash,
     String(String),
+
+    // Specializations
+    Axis(String),
+    Function(String),
+    NodeTest(String),
 }
 
 impl XPathToken {
