@@ -92,3 +92,30 @@ impl XPathAxis for AxisDescendantOrSelf {
         self.descendant.select_nodes(context, node_test, result);
     }
 }
+
+pub struct AxisParent;
+
+impl XPathAxis for AxisParent {
+    fn select_nodes(&self,
+                    context:   &XPathEvaluationContext,
+                    node_test: &XPathNodeTest,
+                    result:    &mut Nodeset)
+    {
+        let parent_context = context.new_context_for(1);
+        parent_context.next(context.node().parent());
+
+        node_test.test(&parent_context, result);
+    }
+}
+
+pub struct AxisSelf;
+
+impl XPathAxis for AxisSelf {
+    fn select_nodes(&self,
+                    context:   &XPathEvaluationContext,
+                    node_test: &XPathNodeTest,
+                    result:    &mut Nodeset)
+    {
+        node_test.test(context, result);
+    }
+}

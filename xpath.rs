@@ -13,6 +13,10 @@ struct XPathNodeTest;
 struct Nodeset;
 
 impl Node {
+    fn parent(&self) -> &Node {
+        self
+    }
+
     fn children(&self) -> std::slice::Items<Node> {
         self.children.iter()
     }
