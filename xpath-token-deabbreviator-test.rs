@@ -3,22 +3,7 @@ extern crate xpath;
 use xpath::token;
 use xpath::token::XPathToken;
 use xpath::tokenizer::TokenResult;
-
-struct XPathTokenDeabbreviator {
-    a: int,
-}
-
-impl XPathTokenDeabbreviator {
-    fn new<I: Iterator<TokenResult>>(source: I) -> XPathTokenDeabbreviator {
-        XPathTokenDeabbreviator {a: 0}
-    }
-}
-
-impl Iterator<TokenResult> for XPathTokenDeabbreviator {
-    fn next(&mut self) -> Option<TokenResult> {
-        None
-    }
-}
+use xpath::deabbreviator::XPathTokenDeabbreviator;
 
 fn all_tokens_raw<I: Iterator<TokenResult>>(tokenizer: I) -> Result<Vec<XPathToken>, & 'static str> {
     std::result::collect(tokenizer)
@@ -34,8 +19,11 @@ fn all_tokens<I: Iterator<TokenResult>>(tokenizer: I) -> Vec<XPathToken> {
 #[test]
 fn converts_at_sign_to_attribute_axis() {
     let input_tokens: Vec<TokenResult> = vec!(Ok(token::AtSign));
+    // let iter: &Iterator<TokenResult> = &input_tokens.move_iter();
 
     let deabbrv = XPathTokenDeabbreviator::new(input_tokens.move_iter());
+    // let a: () = deabbrv.next();
+    // println!("{}",a );
 
     assert_eq!(all_tokens(deabbrv), vec!(token::String("attribute".to_string()),
                                          token::DoubleColon));

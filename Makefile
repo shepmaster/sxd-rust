@@ -1,6 +1,6 @@
-all: xpath-tokenizer-test
+all: xpath-tokenizer-test xpath-token-deabbreviator-test
 
-libxpath.rlib: xpath.rs tokenizer.rs
+libxpath.rlib: xpath.rs tokenizer.rs deabbreviator.rs
 	rustc -g --crate-type=lib xpath.rs
 
 # Need to include library in dependency
