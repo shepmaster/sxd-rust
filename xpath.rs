@@ -24,9 +24,11 @@ impl Node {
 }
 
 
-#[deriving(PartialEq,Show)]
+#[deriving(PartialEq,Show,Clone)]
 pub enum XPathValue {
     Boolean(bool),
+    Number(f64),
+    String(String),
     Nodes(Nodeset), // rename as Nodeset
 }
 
@@ -34,7 +36,23 @@ impl XPathValue {
     fn boolean(&self) -> bool {
         match *self {
             Boolean(val) => val,
-            Nodes(nodeset) => nodeset.size() > 0,
+            Number(n) => n != 0.0 && ! n.is_nan(),
+            String(ref s) => ! s.is_empty(),
+            Nodes(ref nodeset) => nodeset.size() > 0,
+        }
+    }
+
+    fn number(&self) -> f64 {
+        match *self {
+            Number(val) => val,
+            _ => -42.0
+        }
+    }
+
+    fn string(&self) -> String {
+        match *self {
+            String(ref val) => val.clone(),
+            _ => "Unimplemented".to_string(),
         }
     }
 }
@@ -66,7 +84,7 @@ impl XPathNodeTest {
     }
 }
 
-#[deriving(Show,PartialEq)]
+#[deriving(Show,PartialEq,Clone)]
 pub struct Nodeset;
 
 impl Nodeset {
