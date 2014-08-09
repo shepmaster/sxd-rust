@@ -5,18 +5,6 @@ pub struct Node {
     attributes: Vec<Node>,
 }
 
-#[deriving(PartialEq,Show)]
-pub enum XPathValue {
-    Boolean(bool),
-}
-
-pub struct XPathEvaluationContext<'a> {
-    pub node: & 'a Node,
-}
-
-pub struct XPathNodeTest;
-pub struct Nodeset;
-
 impl Node {
     pub fn new() -> Node {
         Node { children: vec!(), attributes: vec!() }
@@ -35,12 +23,24 @@ impl Node {
     }
 }
 
+
+#[deriving(PartialEq,Show)]
+pub enum XPathValue {
+    Boolean(bool),
+    Nodes(Nodeset), // rename as Nodeset
+}
+
 impl XPathValue {
     fn boolean(&self) -> bool {
         match *self {
             Boolean(val) => val,
+            Nodes(nodeset) => nodeset.size() > 0,
         }
     }
+}
+
+pub struct XPathEvaluationContext<'a> {
+    pub node: & 'a Node,
 }
 
 impl<'a> XPathEvaluationContext<'a> {
@@ -58,10 +58,26 @@ impl<'a> XPathEvaluationContext<'a> {
     }
 }
 
+
+pub struct XPathNodeTest;
+
 impl XPathNodeTest {
     fn test(&self, context: &XPathEvaluationContext, result: &mut Nodeset) {
     }
 }
+
+#[deriving(Show,PartialEq)]
+pub struct Nodeset;
+
+impl Nodeset {
+    fn add(&mut self, node: &Node) {
+    }
+
+    fn size(&self) -> uint {
+        0
+    }
+}
+
 
 pub mod token;
 pub mod tokenizer;
