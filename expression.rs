@@ -91,3 +91,13 @@ impl XPathExpression for ExpressionFunction {
         }
     }
 }
+
+pub struct ExpressionLiteral {
+    pub value: XPathValue,
+}
+
+impl XPathExpression for ExpressionLiteral {
+    fn evaluate(&self, context: &XPathEvaluationContext) -> XPathValue {
+        self.value.clone()
+    }
+}
