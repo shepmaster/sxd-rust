@@ -1,10 +1,9 @@
-use super::super::Node;
 use super::super::XPathEvaluationContext;
 use super::super::XPathNodeTest;
 use super::super::Nodeset;
 use super::XPathAxis;
 
-struct AxisChild;
+pub struct AxisChild;
 
 impl XPathAxis for AxisChild {
     fn select_nodes(context:   &XPathEvaluationContext,

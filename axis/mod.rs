@@ -2,6 +2,7 @@ use super::XPathEvaluationContext;
 use super::XPathNodeTest;
 use super::Nodeset;
 
+pub mod attribute;
 pub mod child;
 
 enum PrincipalNodeType {

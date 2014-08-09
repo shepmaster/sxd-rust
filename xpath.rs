@@ -2,6 +2,7 @@
 
 struct Node {
     children: Vec<Node>,
+    attributes: Vec<Node>,
 }
 
 struct XPathEvaluationContext<'a> {
@@ -14,6 +15,10 @@ struct Nodeset;
 impl Node {
     fn children(&self) -> std::slice::Items<Node> {
         self.children.iter()
+    }
+
+    fn attributes(&self) -> std::slice::Items<Node> {
+        self.attributes.iter()
     }
 }
 
