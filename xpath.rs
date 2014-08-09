@@ -1,5 +1,7 @@
 #![crate_name = "xpath"]
 
+use std::collections::HashMap;
+
 pub struct Node {
     children: Vec<Node>,
     attributes: Vec<Node>,
@@ -57,8 +59,15 @@ impl XPathValue {
     }
 }
 
+pub trait XPathFunction {
+    fn evaluate(&self,
+                context: &XPathEvaluationContext,
+                args: Vec<XPathValue>) -> XPathValue;
+}
+
 pub struct XPathEvaluationContext<'a> {
     pub node: & 'a Node,
+    pub functions: & 'a HashMap<String, Box<XPathFunction>>,
 }
 
 impl<'a> XPathEvaluationContext<'a> {
@@ -69,10 +78,15 @@ impl<'a> XPathEvaluationContext<'a> {
     fn new_context_for(&self, size: uint) -> XPathEvaluationContext {
         XPathEvaluationContext {
             node: self.node,
+            functions: self.functions,
         }
     }
 
     fn next(&self, node: &Node) {
+    }
+
+    fn function_for_name(&self, name: &str) -> Option<&Box<XPathFunction>> {
+        self.functions.find(&name.to_string())
     }
 }
 

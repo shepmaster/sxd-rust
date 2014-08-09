@@ -72,3 +72,22 @@ impl XPathExpression for ExpressionNotEqual {
         Boolean(!self.equal.boolean_evaluate(context))
     }
 }
+
+pub struct ExpressionFunction {
+    pub name: String,
+    pub arguments: Vec<Box<XPathExpression>>,
+}
+
+impl XPathExpression for ExpressionFunction {
+    fn evaluate(&self, context: &XPathEvaluationContext) -> XPathValue {
+        match context.function_for_name(self.name.as_slice()) {
+            Some(fun) => {
+                // TODO: Error when argument count mismatch
+                let args = self.arguments.iter().map(|ref arg| arg.evaluate(context)).collect();
+
+                fun.evaluate(context, args)
+            },
+            None => fail!("throw UnknownXPathFunctionException(_name)"),
+        }
+    }
+}
