@@ -3,24 +3,7 @@ extern crate xpath;
 use xpath::token;
 use xpath::token::XPathToken;
 use xpath::tokenizer::TokenResult;
-
-struct XPathTokenDisambiguator<I> {
-    source: I,
-}
-
-impl<I> XPathTokenDisambiguator<I> {
-    fn new(source: I) -> XPathTokenDisambiguator<I> {
-        XPathTokenDisambiguator{
-            source: source,
-        }
-    }
-}
-
-impl<I> Iterator<TokenResult> for XPathTokenDisambiguator<I> {
-    fn next(&mut self) -> Option<TokenResult> {
-        None
-    }
-}
+use xpath::disambiguator::XPathTokenDisambiguator;
 
 fn all_tokens_raw<I: Iterator<TokenResult>>(tokenizer: I) -> Result<Vec<XPathToken>, & 'static str> {
     std::result::collect(tokenizer)
@@ -57,11 +40,11 @@ fn name_followed_by_left_paren_becomes_function_name() {
         Ok(token::LeftParen),
      );
 
-  let disambig = XPathTokenDisambiguator::new(input_tokens.move_iter());
+    let disambig = XPathTokenDisambiguator::new(input_tokens.move_iter());
 
-  assert_eq!(all_tokens(disambig),
-             vec!(token::Function("test".to_string()),
-                  token::LeftParen));
+    assert_eq!(all_tokens(disambig),
+               vec!(token::Function("test".to_string()),
+                    token::LeftParen));
 }
 
 #[test]
@@ -71,9 +54,9 @@ fn name_followed_by_double_colon_becomes_axis_name() {
         Ok(token::DoubleColon),
     );
 
-  let disambig = XPathTokenDisambiguator::new(input_tokens.move_iter());
+    let disambig = XPathTokenDisambiguator::new(input_tokens.move_iter());
 
     assert_eq!(all_tokens(disambig),
-             vec!(token::Axis("test".to_string()),
-                  token::DoubleColon));
+               vec!(token::Axis("test".to_string()),
+                    token::DoubleColon));
 }
