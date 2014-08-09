@@ -1,78 +1,8 @@
 use std::collections::hashmap::HashMap;
 use std::char::is_digit;
 
-#[deriving(PartialEq,Show,Clone)]
-pub enum XPathToken {
-    And,
-    AtSign,
-    CurrentNode,
-    Divide,
-    DollarSign,
-    DoubleColon,
-    DoubleSlash,
-    Equal,
-    GreaterThan,
-    GreaterThanOrEqual,
-    LeftBracket,
-    LeftParen,
-    LessThan,
-    LessThanOrEqual,
-    Literal(String),
-    MinusSign,
-    Multiply,
-    NotEqual,
-    Number(f64),
-    Or,
-    ParentNode,
-    Pipe,
-    PlusSign,
-    PrefixedName(String, String),
-    Remainder,
-    RightBracket,
-    RightParen,
-    Slash,
-    String(String),
-}
-
-impl XPathToken {
-    fn precedes_node_test(& self) -> bool {
-        match *self {
-            AtSign |
-            DoubleColon => true,
-            _ => false,
-        }
-    }
-
-    fn precedes_expression(& self) -> bool {
-        match *self {
-            LeftParen |
-            LeftBracket => true,
-            _ => false,
-        }
-    }
-
-    fn is_operator(& self) -> bool {
-        match *self {
-            Slash |
-            DoubleSlash |
-            PlusSign |
-            MinusSign |
-            Pipe |
-            Equal |
-            NotEqual |
-            LessThan |
-            LessThanOrEqual |
-            GreaterThan |
-            GreaterThanOrEqual |
-            And |
-            Or |
-            Remainder |
-            Divide |
-            Multiply => true,
-            _ => false,
-        }
-    }
-}
+use super::token;
+use super::token::XPathToken;
 
 pub struct XPathTokenizer {
     xpath: XPathString,
@@ -234,39 +164,39 @@ impl XPathTokenizer {
 
     fn two_char_tokens(& self) -> HashMap<String, XPathToken> {
         let mut m = HashMap::new();
-        m.insert("<=".to_string(), LessThanOrEqual);
-        m.insert(">=".to_string(), GreaterThanOrEqual);
-        m.insert("!=".to_string(), NotEqual);
-        m.insert("::".to_string(), DoubleColon);
-        m.insert("//".to_string(), DoubleSlash);
-        m.insert("..".to_string(), ParentNode);
+        m.insert("<=".to_string(), token::LessThanOrEqual);
+        m.insert(">=".to_string(), token::GreaterThanOrEqual);
+        m.insert("!=".to_string(), token::NotEqual);
+        m.insert("::".to_string(), token::DoubleColon);
+        m.insert("//".to_string(), token::DoubleSlash);
+        m.insert("..".to_string(), token::ParentNode);
         m
     }
 
     fn single_char_tokens(&self) -> HashMap<char, XPathToken> {
         let mut m = HashMap::new();
-        m.insert('/', Slash);
-        m.insert('(', LeftParen);
-        m.insert(')', RightParen);
-        m.insert('[', LeftBracket);
-        m.insert(']', RightBracket);
-        m.insert('@', AtSign);
-        m.insert('$', DollarSign);
-        m.insert('+', PlusSign);
-        m.insert('-', MinusSign);
-        m.insert('|', Pipe);
-        m.insert('=', Equal);
-        m.insert('<', LessThan);
-        m.insert('>', GreaterThan);
+        m.insert('/', token::Slash);
+        m.insert('(', token::LeftParen);
+        m.insert(')', token::RightParen);
+        m.insert('[', token::LeftBracket);
+        m.insert(']', token::RightBracket);
+        m.insert('@', token::AtSign);
+        m.insert('$', token::DollarSign);
+        m.insert('+', token::PlusSign);
+        m.insert('-', token::MinusSign);
+        m.insert('|', token::Pipe);
+        m.insert('=', token::Equal);
+        m.insert('<', token::LessThan);
+        m.insert('>', token::GreaterThan);
         m
     }
 
     fn named_operators(& self) -> Vec<(& 'static str, XPathToken)> {
-        vec!(("and", And),
-             ("or",  Or),
-             ("mod", Remainder),
-             ("div", Divide),
-             ("*",   Multiply))
+        vec!(("and", token::And),
+             ("or",  token::Or),
+             ("mod", token::Remainder),
+             ("div", token::Divide),
+             ("*",   token::Multiply))
     }
 
     fn tokenize_literal(& mut self, quote_char: char) -> Result<XPathToken, & 'static str> {
@@ -284,7 +214,7 @@ impl XPathTokenizer {
         offset += 1; // Skip over ending quote
 
         self.start = offset;
-        return Ok(Literal(self.xpath.substr(start_of_string, end_of_string)));
+        return Ok(token::Literal(self.xpath.substr(start_of_string, end_of_string)));
     }
 
     fn raw_next_token(& mut self) -> Result<XPathToken, & 'static str> {
@@ -321,7 +251,7 @@ impl XPathTokenizer {
             if self.xpath.char_at_is_not_digit(self.start + 1) {
                 // Ugly. Should we use START / FOLLOW constructs?
                 self.start += 1;
-                return Ok(CurrentNode);
+                return Ok(token::CurrentNode);
             }
         }
 
@@ -334,7 +264,7 @@ impl XPathTokenizer {
             self.start = offset;
             let substr = self.xpath.substr(current_start, offset);
             match from_str(substr.as_slice()) {
-                Some(value) => Ok(Number(value)),
+                Some(value) => Ok(token::Number(value)),
                 None => fail!("Not really a number!")
             }
         } else {
@@ -355,7 +285,7 @@ impl XPathTokenizer {
 
             if self.xpath.char_at_is(offset, '*') {
                 self.start = offset + 1;
-                return Ok(String("*".to_string()));
+                return Ok(token::String("*".to_string()));
             }
 
             offset = self.xpath.while_valid_string(offset);
@@ -375,11 +305,11 @@ impl XPathTokenizer {
                 let name = self.xpath.substr(current_start, offset);
 
                 self.start = offset;
-                return Ok(PrefixedName(prefix, name));
+                return Ok(token::PrefixedName(prefix, name));
 
             } else {
                 self.start = offset;
-                return Ok(String(self.xpath.substr(current_start, offset)));
+                return Ok(token::String(self.xpath.substr(current_start, offset)));
             }
         }
     }
