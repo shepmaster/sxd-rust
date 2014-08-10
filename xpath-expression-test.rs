@@ -12,7 +12,8 @@ use xpath::expression::{ExpressionAnd,
                         ExpressionFunction,
                         ExpressionLiteral,
                         ExpressionMath,
-                        ExpressionPredicate};
+                        ExpressionPredicate,
+                        ExpressionRelational};
 use xpath::XPathFunction;
 use xpath::XPathEvaluationContext;
 
@@ -218,4 +219,18 @@ fn expression_step_false_predicate_selects_no_nodes() {
         },
         _ => fail!("Not a nodeset"),
     }
+}
+
+#[test]
+fn expression_relational_does_basic_comparisons() {
+    let left  = box ExpressionLiteral{value: Number(10.0)};
+    let right = box ExpressionLiteral{value: Number(5.0)};
+
+    let node = Node::new();
+    let funs = HashMap::new();
+    let context = XPathEvaluationContext::new(&node, &funs);
+    let expr = ExpressionRelational::less_than(left, right);
+
+    let res = expr.evaluate(&context);
+    assert_eq!(res, Boolean(false));
 }

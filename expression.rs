@@ -231,3 +231,49 @@ impl<'n> XPathExpression<'n> for ExpressionPredicate<'n> {
         Nodes(selected)
     }
 }
+
+pub struct ExpressionRelational<'n> {
+    pub  left: Box<XPathExpression<'n>>,
+    pub right: Box<XPathExpression<'n>>,
+    pub operation: fn(f64, f64) -> bool,
+}
+
+fn             less_than(left: f64, right: f64) -> bool { left <  right }
+fn    less_than_or_equal(left: f64, right: f64) -> bool { left <= right }
+fn          greater_than(left: f64, right: f64) -> bool { left >  right }
+fn greater_than_or_equal(left: f64, right: f64) -> bool { left >= right }
+
+impl<'n> ExpressionRelational<'n> {
+    pub fn less_than(left: Box<XPathExpression<'n>>,
+                right: Box<XPathExpression<'n>>) -> ExpressionRelational<'n>
+    {
+        ExpressionRelational{left: left, right: right, operation: less_than}
+    }
+
+    pub fn less_than_or_equal(left: Box<XPathExpression<'n>>,
+                       right: Box<XPathExpression<'n>>) -> ExpressionRelational<'n>
+    {
+        ExpressionRelational{left: left, right: right, operation: less_than_or_equal}
+    }
+
+    pub fn greater_than(left: Box<XPathExpression<'n>>,
+                   right: Box<XPathExpression<'n>>) -> ExpressionRelational<'n>
+    {
+        ExpressionRelational{left: left, right: right, operation: greater_than}
+    }
+
+    pub fn greater_than_or_equal(left: Box<XPathExpression<'n>>,
+                          right: Box<XPathExpression<'n>>) -> ExpressionRelational<'n>
+    {
+        ExpressionRelational{left: left, right: right, operation: greater_than_or_equal}
+    }
+}
+
+impl<'n> XPathExpression<'n> for ExpressionRelational<'n> {
+    fn evaluate(&self, context: &XPathEvaluationContext<'n>) -> XPathValue<'n> {
+        let left_val = self.left.evaluate(context);
+        let right_val = self.right.evaluate(context);
+        let op = self.operation;
+        Boolean(op(left_val.number(), right_val.number()))
+    }
+}
