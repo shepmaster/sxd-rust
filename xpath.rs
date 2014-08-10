@@ -57,6 +57,10 @@ impl XPathValue {
             _ => "Unimplemented".to_string(),
         }
     }
+
+    fn nodeset(&self) -> Nodeset {
+        Nodeset
+    }
 }
 
 pub trait XPathFunction {
@@ -105,11 +109,23 @@ impl Nodeset {
     fn add(&mut self, node: &Node) {
     }
 
+    fn add_nodeset(&mut self, nodes: &Nodeset) {
+    }
+
     fn size(&self) -> uint {
         0
     }
+
+    fn iter(&self) -> EmptyIterator<&Node> {
+        EmptyIterator
+    }
 }
 
+struct EmptyIterator<T>;
+
+impl<T> Iterator<T> for EmptyIterator<T> {
+    fn next(&mut self) -> Option<T> { None }
+}
 
 pub mod token;
 pub mod tokenizer;

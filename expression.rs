@@ -167,3 +167,31 @@ impl XPathExpression for ExpressionOr {
                        self.right.evaluate(context).boolean())
     }
 }
+
+pub struct ExpressionPath {
+    start_point: Box<XPathExpression>,
+    steps: Vec<Box<XPathExpression>>,
+}
+
+impl XPathExpression for ExpressionPath {
+    fn evaluate(&self, context: &XPathEvaluationContext) -> XPathValue {
+        let mut result = self.start_point.evaluate(context).nodeset();
+
+        for step in self.steps.iter() {
+            let mut step_result = Nodeset;
+
+            let sub_context = context.new_context_for(result.size());
+
+            for current_node in result.iter() {
+                sub_context.next(current_node);
+                let selected = step.evaluate(&sub_context);
+                // TODO: What if it is not a nodeset?
+                step_result.add_nodeset(&selected.nodeset());
+            }
+
+            result = step_result;
+        }
+
+        Nodes(result)
+    }
+}
