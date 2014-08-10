@@ -3,17 +3,17 @@ use super::XPathValue;
 use super::{Boolean,Number,String,Nodes};
 use super::Nodeset;
 
-pub trait XPathExpression {
-    fn evaluate(&self, context: &XPathEvaluationContext) -> XPathValue;
+pub trait XPathExpression<'n> {
+    fn evaluate(& self, context: &XPathEvaluationContext<'n>) -> XPathValue<'n>;
 }
 
-pub struct ExpressionAnd {
-    pub left:  Box<XPathExpression>,
-    pub right: Box<XPathExpression>,
+pub struct ExpressionAnd<'n> {
+    pub left:  Box<XPathExpression<'n>>,
+    pub right: Box<XPathExpression<'n>>,
 }
 
-impl XPathExpression for ExpressionAnd {
-    fn evaluate(&self, context: &XPathEvaluationContext) -> XPathValue {
+impl<'n> XPathExpression<'n> for ExpressionAnd<'n> {
+    fn evaluate(& self, context: &XPathEvaluationContext<'n>) -> XPathValue<'n> {
         Boolean(self.left.evaluate(context).boolean() &&
                 self.right.evaluate(context).boolean())
     }
@@ -21,21 +21,21 @@ impl XPathExpression for ExpressionAnd {
 
 pub struct ExpressionContextNode;
 
-impl XPathExpression for ExpressionContextNode {
-    fn evaluate(&self, context: &XPathEvaluationContext) -> XPathValue {
+impl<'n> XPathExpression<'n> for ExpressionContextNode {
+    fn evaluate(&self, context: &XPathEvaluationContext<'n>) -> XPathValue<'n> {
         let mut result = Nodeset::new();
         result.add(context.node());
-        Nodes(result)
+        Nodes(result.clone())
     }
 }
 
-pub struct ExpressionEqual {
-    pub left:  Box<XPathExpression>,
-    pub right: Box<XPathExpression>,
+pub struct ExpressionEqual<'n> {
+    pub left:  Box<XPathExpression<'n>>,
+    pub right: Box<XPathExpression<'n>>,
 }
 
-impl ExpressionEqual {
-    fn boolean_evaluate(&self, context: &XPathEvaluationContext) -> bool {
+impl<'n> ExpressionEqual<'n> {
+    fn boolean_evaluate(& self, context: &XPathEvaluationContext<'n>) -> bool {
         let left_val = self.left.evaluate(context);
         let right_val = self.right.evaluate(context);
 
@@ -49,37 +49,37 @@ impl ExpressionEqual {
     }
 }
 
-impl XPathExpression for ExpressionEqual {
-    fn evaluate(&self, context: &XPathEvaluationContext) -> XPathValue {
+impl<'n> XPathExpression<'n> for ExpressionEqual<'n> {
+    fn evaluate(& self, context: &XPathEvaluationContext<'n>) -> XPathValue<'n> {
         Boolean(self.boolean_evaluate(context))
     }
 }
 
-pub struct ExpressionNotEqual {
-    equal: ExpressionEqual,
+pub struct ExpressionNotEqual<'n> {
+    equal: ExpressionEqual<'n>,
 }
 
-impl ExpressionNotEqual {
-    pub fn new(left: Box<XPathExpression>, right: Box<XPathExpression>) -> ExpressionNotEqual {
+impl<'n> ExpressionNotEqual<'n> {
+    pub fn new(left: Box<XPathExpression<'n>>, right: Box<XPathExpression<'n>>) -> ExpressionNotEqual<'n> {
         ExpressionNotEqual {
             equal: ExpressionEqual{left: left, right: right}
         }
     }
 }
 
-impl XPathExpression for ExpressionNotEqual {
-    fn evaluate(&self, context: &XPathEvaluationContext) -> XPathValue {
+impl<'n> XPathExpression<'n> for ExpressionNotEqual<'n> {
+    fn evaluate(& self, context: &XPathEvaluationContext<'n>) -> XPathValue<'n> {
         Boolean(!self.equal.boolean_evaluate(context))
     }
 }
 
-pub struct ExpressionFunction {
+pub struct ExpressionFunction<'n> {
     pub name: String,
-    pub arguments: Vec<Box<XPathExpression>>,
+    pub arguments: Vec<Box<XPathExpression<'n>>>,
 }
 
-impl XPathExpression for ExpressionFunction {
-    fn evaluate(&self, context: &XPathEvaluationContext) -> XPathValue {
+impl<'n> XPathExpression<'n> for ExpressionFunction<'n> {
+    fn evaluate(& self, context: &XPathEvaluationContext<'n>) -> XPathValue<'n> {
         match context.function_for_name(self.name.as_slice()) {
             Some(fun) => {
                 // TODO: Error when argument count mismatch
@@ -92,19 +92,19 @@ impl XPathExpression for ExpressionFunction {
     }
 }
 
-pub struct ExpressionLiteral {
-    pub value: XPathValue,
+pub struct ExpressionLiteral<'n> {
+    pub value: XPathValue<'n>,
 }
 
-impl XPathExpression for ExpressionLiteral {
-    fn evaluate(&self, context: &XPathEvaluationContext) -> XPathValue {
+impl<'n> XPathExpression<'n> for ExpressionLiteral<'n> {
+    fn evaluate(& self, context: &XPathEvaluationContext<'n>) -> XPathValue<'n> {
         self.value.clone()
     }
 }
 
-pub struct ExpressionMath {
-    left:  Box<XPathExpression>,
-    right: Box<XPathExpression>,
+pub struct ExpressionMath<'n> {
+    left:  Box<XPathExpression<'n>>,
+    right: Box<XPathExpression<'n>>,
     operation: fn(f64, f64) -> f64,
 }
 
@@ -114,30 +114,30 @@ fn multiply(a: f64, b: f64) -> f64 {a * b}
 fn   divide(a: f64, b: f64) -> f64 {a / b}
 fn  modulus(a: f64, b: f64) -> f64 {a % b}
 
-impl ExpressionMath {
-    pub fn addition(left: Box<XPathExpression>, right: Box<XPathExpression>) -> ExpressionMath {
+impl<'n> ExpressionMath<'n> {
+    pub fn addition(left: Box<XPathExpression<'n>>, right: Box<XPathExpression<'n>>) -> ExpressionMath<'n> {
         ExpressionMath{left: left, right: right, operation: add}
     }
 
-    pub fn subtraction(left: Box<XPathExpression>, right: Box<XPathExpression>) -> ExpressionMath {
+    pub fn subtraction(left: Box<XPathExpression<'n>>, right: Box<XPathExpression<'n>>) -> ExpressionMath<'n> {
         ExpressionMath{left: left, right: right, operation: subtract}
     }
 
-    pub fn multiplication(left: Box<XPathExpression>, right: Box<XPathExpression>) -> ExpressionMath {
+    pub fn multiplication(left: Box<XPathExpression<'n>>, right: Box<XPathExpression<'n>>) -> ExpressionMath<'n> {
         ExpressionMath{left: left, right: right, operation: multiply}
     }
 
-    pub fn division(left: Box<XPathExpression>, right: Box<XPathExpression>) -> ExpressionMath {
+    pub fn division(left: Box<XPathExpression<'n>>, right: Box<XPathExpression<'n>>) -> ExpressionMath<'n> {
         ExpressionMath{left: left, right: right, operation: divide}
     }
 
-    pub fn remainder(left: Box<XPathExpression>, right: Box<XPathExpression>) -> ExpressionMath {
+    pub fn remainder(left: Box<XPathExpression<'n>>, right: Box<XPathExpression<'n>>) -> ExpressionMath<'n> {
         ExpressionMath{left: left, right: right, operation: modulus}
     }
 }
 
-impl XPathExpression for ExpressionMath {
-    fn evaluate(&self, context: &XPathEvaluationContext) -> XPathValue {
+impl<'n> XPathExpression<'n> for ExpressionMath<'n> {
+    fn evaluate(& self, context: &XPathEvaluationContext<'n>) -> XPathValue<'n> {
         let left = self.left.evaluate(context);
         let right = self.right.evaluate(context);
         let op = self.operation;
@@ -145,36 +145,36 @@ impl XPathExpression for ExpressionMath {
     }
 }
 
-pub struct ExpressionNegation {
-    expression: Box<XPathExpression>,
+pub struct ExpressionNegation<'n> {
+    expression: Box<XPathExpression<'n>>,
 }
 
-impl XPathExpression for ExpressionNegation {
-    fn evaluate(&self, context: &XPathEvaluationContext) -> XPathValue {
+impl<'n> XPathExpression<'n> for ExpressionNegation<'n> {
+    fn evaluate(& self, context: &XPathEvaluationContext<'n>) -> XPathValue<'n> {
         let result = self.expression.evaluate(context);
         return Number(-result.number());
     }
 }
 
-pub struct ExpressionOr {
-    left:  Box<XPathExpression>,
-    right: Box<XPathExpression>,
+pub struct ExpressionOr<'n> {
+    left:  Box<XPathExpression<'n>>,
+    right: Box<XPathExpression<'n>>,
 }
 
-impl XPathExpression for ExpressionOr {
-    fn evaluate(&self, context: &XPathEvaluationContext) -> XPathValue {
+impl<'n> XPathExpression<'n> for ExpressionOr<'n> {
+    fn evaluate(& self, context: &XPathEvaluationContext<'n>) -> XPathValue<'n> {
         return Boolean(self.left.evaluate(context).boolean() ||
                        self.right.evaluate(context).boolean())
     }
 }
 
-pub struct ExpressionPath {
-    start_point: Box<XPathExpression>,
-    steps: Vec<Box<XPathExpression>>,
+pub struct ExpressionPath<'n> {
+    start_point: Box<XPathExpression<'n>>,
+    steps: Vec<Box<XPathExpression<'n>>>,
 }
 
-impl XPathExpression for ExpressionPath {
-    fn evaluate(&self, context: &XPathEvaluationContext) -> XPathValue {
+impl<'n> XPathExpression<'n> for ExpressionPath<'n> {
+    fn evaluate(& self, context: &XPathEvaluationContext<'n>) -> XPathValue<'n> {
         let mut result = self.start_point.evaluate(context).nodeset();
 
         for step in self.steps.iter() {

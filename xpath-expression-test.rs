@@ -17,8 +17,8 @@ use xpath::XPathEvaluationContext;
 
 struct FailExpression;
 
-impl XPathExpression for FailExpression {
-    fn evaluate(&self, _: &XPathEvaluationContext) -> XPathValue {
+impl<'n> XPathExpression<'n> for FailExpression {
+    fn evaluate(&self, _: &XPathEvaluationContext<'n>) -> XPathValue<'n> {
         fail!("Should never be called");
     }
 }
@@ -109,14 +109,14 @@ fn expression_not_equal_negates_equality() {
     assert_eq!(res, Boolean(true));
 }
 
-struct StubFunction {
-    value: XPathValue,
+struct StubFunction<'n> {
+    value: XPathValue<'n>,
 }
 
-impl XPathFunction for StubFunction {
+impl<'n> XPathFunction<'n> for StubFunction<'n> {
     fn evaluate(&self,
                 _: &XPathEvaluationContext,
-                _: Vec<XPathValue>) -> XPathValue
+                _: Vec<XPathValue>) -> XPathValue<'n>
     {
         self.value.clone()
     }

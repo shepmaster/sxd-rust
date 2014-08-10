@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 
+#[deriving(Show,PartialEq,Clone)]
 pub struct Node {
     children: Vec<Node>,
     attributes: Vec<Node>,
@@ -27,14 +28,14 @@ impl Node {
 
 
 #[deriving(PartialEq,Show,Clone)]
-pub enum XPathValue {
+pub enum XPathValue<'n> {
     Boolean(bool),
     Number(f64),
     String(String),
-    Nodes(Nodeset), // rename as Nodeset
+    Nodes(Nodeset<'n>), // rename as Nodeset
 }
 
-impl XPathValue {
+impl<'n> XPathValue<'n> {
     fn boolean(&self) -> bool {
         match *self {
             Boolean(val) => val,
@@ -58,28 +59,31 @@ impl XPathValue {
         }
     }
 
-    fn nodeset(&self) -> Nodeset {
-        Nodeset::new()
+    fn nodeset(&self) -> Nodeset<'n> {
+        match *self {
+            Nodes(ref ns) => ns.clone(),
+            _ => fail!("Did not evaluate to a nodeset!"),
+        }
     }
 }
 
-pub trait XPathFunction {
+pub trait XPathFunction<'n> {
     fn evaluate(&self,
                 context: &XPathEvaluationContext,
-                args: Vec<XPathValue>) -> XPathValue;
+                args: Vec<XPathValue>) -> XPathValue<'n>;
 }
 
 pub struct XPathEvaluationContext<'a> {
     pub node: & 'a Node,
-    pub functions: & 'a HashMap<String, Box<XPathFunction>>,
+    pub functions: & 'a HashMap<String, Box<XPathFunction<'a>>>,
 }
 
 impl<'a> XPathEvaluationContext<'a> {
-    fn node(&self) -> &Node {
+    fn node(&self) -> & 'a Node {
         self.node
     }
 
-    fn new_context_for(&self, size: uint) -> XPathEvaluationContext {
+    fn new_context_for(& self, size: uint) -> XPathEvaluationContext<'a> {
         XPathEvaluationContext {
             node: self.node,
             functions: self.functions,
@@ -89,7 +93,7 @@ impl<'a> XPathEvaluationContext<'a> {
     fn next(&self, node: &Node) {
     }
 
-    fn function_for_name(&self, name: &str) -> Option<&Box<XPathFunction>> {
+    fn function_for_name(&self, name: &str) -> Option<& 'a Box<XPathFunction<'a>>> {
         self.functions.find(&name.to_string())
     }
 }
@@ -103,26 +107,28 @@ impl XPathNodeTest {
 }
 
 #[deriving(Show,PartialEq,Clone)]
-pub struct Nodeset {
-    a: int,
+pub struct Nodeset<'n> {
+    a: Vec<& 'n Node>,
 }
 
-impl Nodeset {
-    fn new() -> Nodeset {
-        Nodeset{a: 0}
+impl<'n> Nodeset<'n> {
+    fn new() -> Nodeset<'n> {
+        Nodeset{a: Vec::new()}
     }
 
-    fn add(&mut self, node: &Node) {
+    fn add(& mut self, node: & 'n Node) {
+        self.a.push(node);
     }
 
-    fn add_nodeset(&mut self, nodes: &Nodeset) {
+    fn add_nodeset(& mut self, nodes: &Nodeset<'n>) {
+        self.a.push_all(nodes.a.as_slice());
     }
 
     fn size(&self) -> uint {
         0
     }
 
-    fn iter(&self) -> EmptyIterator<&Node> {
+    fn iter(&self) -> EmptyIterator<& 'n Node> {
         EmptyIterator
     }
 }
