@@ -23,7 +23,7 @@ pub struct ExpressionContextNode;
 
 impl XPathExpression for ExpressionContextNode {
     fn evaluate(&self, context: &XPathEvaluationContext) -> XPathValue {
-        let mut result = Nodeset;
+        let mut result = Nodeset::new();
         result.add(context.node());
         Nodes(result)
     }
@@ -178,7 +178,7 @@ impl XPathExpression for ExpressionPath {
         let mut result = self.start_point.evaluate(context).nodeset();
 
         for step in self.steps.iter() {
-            let mut step_result = Nodeset;
+            let mut step_result = Nodeset::new();
 
             let sub_context = context.new_context_for(result.size());
 

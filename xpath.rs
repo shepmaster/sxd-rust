@@ -59,7 +59,7 @@ impl XPathValue {
     }
 
     fn nodeset(&self) -> Nodeset {
-        Nodeset
+        Nodeset::new()
     }
 }
 
@@ -103,9 +103,15 @@ impl XPathNodeTest {
 }
 
 #[deriving(Show,PartialEq,Clone)]
-pub struct Nodeset;
+pub struct Nodeset {
+    a: int,
+}
 
 impl Nodeset {
+    fn new() -> Nodeset {
+        Nodeset{a: 0}
+    }
+
     fn add(&mut self, node: &Node) {
     }
 
