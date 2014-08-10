@@ -195,3 +195,39 @@ impl<'n> XPathExpression<'n> for ExpressionPath<'n> {
         Nodes(result)
     }
 }
+
+pub struct ExpressionPredicate<'n> {
+    pub node_selector: Box<XPathExpression<'n>>,
+    pub predicate: Box<XPathExpression<'n>>,
+}
+
+impl<'n> ExpressionPredicate<'n> {
+    fn include(value: &XPathValue, context: &XPathEvaluationContext) -> bool {
+        match value {
+            &Number(v) => context.position() == v as uint,
+            _ => value.boolean()
+        }
+    }
+}
+
+impl<'n> XPathExpression<'n> for ExpressionPredicate<'n> {
+    fn evaluate(&self, context: &XPathEvaluationContext<'n>) -> XPathValue<'n> {
+        let mut selected = Nodeset::new();
+
+        let nodes = self.node_selector.evaluate(context).nodeset();
+
+        let mut sub_context = context.new_context_for(nodes.size());
+
+        for current_node in nodes.iter() {
+            sub_context.next(*current_node);
+
+            let value = self.predicate.evaluate(&sub_context);
+
+            if ExpressionPredicate::include(&value, &sub_context) {
+                selected.add(*current_node);
+            }
+        }
+
+        Nodes(selected)
+    }
+}

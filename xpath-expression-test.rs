@@ -4,14 +4,15 @@ use std::collections::HashMap;
 
 use xpath::XPathValue;
 use xpath::{Boolean, Number, String, Nodes};
-use xpath::Node;
+use xpath::{Node, Nodeset};
 use xpath::expression::XPathExpression;
 use xpath::expression::{ExpressionAnd,
                         ExpressionEqual,
                         ExpressionNotEqual,
                         ExpressionFunction,
                         ExpressionLiteral,
-                        ExpressionMath};
+                        ExpressionMath,
+                        ExpressionPredicate};
 use xpath::XPathFunction;
 use xpath::XPathEvaluationContext;
 
@@ -160,4 +161,61 @@ fn expression_math_does_basic_math() {
 
     let res = expr.evaluate(&context);
     assert_eq!(res, Number(50.0));
+}
+
+#[test]
+fn expression_step_numeric_predicate_selects_that_node() {
+    let input_node_1 = Node::new_with_parent(1);
+    let input_node_2 = Node::new_with_parent(2);
+    let mut input_nodeset = Nodeset::new();
+    input_nodeset.add(&input_node_1);
+    input_nodeset.add(&input_node_2);
+
+    let selected_nodes = box ExpressionLiteral{value: Nodes(input_nodeset)};
+    let predicate = box ExpressionLiteral{value: Number(1.0)};
+
+    let node = Node::new();
+    let funs = HashMap::new();
+    let context = XPathEvaluationContext::new(&node, &funs);
+    let expr = ExpressionPredicate{node_selector: selected_nodes, predicate: predicate};
+
+    let res = expr.evaluate(&context);
+
+    match res {
+        Nodes(ns) => {
+            let mut e = Nodeset::new();
+            e.add(&input_node_1);
+
+            assert_eq!(ns, e);
+        },
+        _ => fail!("Not a nodeset"),
+    }
+}
+
+#[test]
+fn expression_step_false_predicate_selects_no_nodes() {
+    let input_node_1 = Node::new_with_parent(1);
+    let input_node_2 = Node::new_with_parent(2);
+    let mut input_nodeset = Nodeset::new();
+    input_nodeset.add(&input_node_1);
+    input_nodeset.add(&input_node_2);
+
+    let selected_nodes = box ExpressionLiteral{value: Nodes(input_nodeset)};
+    let predicate = box ExpressionLiteral{value: Boolean(false)};
+
+    let node = Node::new();
+    let funs = HashMap::new();
+    let context = XPathEvaluationContext::new(&node, &funs);
+    let expr = ExpressionPredicate{node_selector: selected_nodes, predicate: predicate};
+
+    let res = expr.evaluate(&context);
+
+    match res {
+        Nodes(ns) => {
+            let e = Nodeset::new();
+
+            assert_eq!(ns, e);
+        },
+        _ => fail!("Not a nodeset"),
+    }
 }
