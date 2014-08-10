@@ -155,3 +155,15 @@ impl XPathExpression for ExpressionNegation {
         return Number(-result.number());
     }
 }
+
+pub struct ExpressionOr {
+    left:  Box<XPathExpression>,
+    right: Box<XPathExpression>,
+}
+
+impl XPathExpression for ExpressionOr {
+    fn evaluate(&self, context: &XPathEvaluationContext) -> XPathValue {
+        return Boolean(self.left.evaluate(context).boolean() ||
+                       self.right.evaluate(context).boolean())
+    }
+}
