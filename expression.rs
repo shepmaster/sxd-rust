@@ -183,7 +183,7 @@ impl<'n> XPathExpression<'n> for ExpressionPath<'n> {
             let sub_context = context.new_context_for(result.size());
 
             for current_node in result.iter() {
-                sub_context.next(current_node);
+                sub_context.next(*current_node);
                 let selected = step.evaluate(&sub_context);
                 // TODO: What if it is not a nodeset?
                 step_result.add_nodeset(&selected.nodeset());

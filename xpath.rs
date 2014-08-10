@@ -108,28 +108,28 @@ impl XPathNodeTest {
 
 #[deriving(Show,PartialEq,Clone)]
 pub struct Nodeset<'n> {
-    a: Vec<& 'n Node>,
+    nodes: Vec<& 'n Node>,
 }
 
 impl<'n> Nodeset<'n> {
-    fn new() -> Nodeset<'n> {
-        Nodeset{a: Vec::new()}
+    pub fn new() -> Nodeset<'n> {
+        Nodeset{nodes: Vec::new()}
     }
 
-    fn add(& mut self, node: & 'n Node) {
-        self.a.push(node);
+    pub fn add(& mut self, node: & 'n Node) {
+        self.nodes.push(node);
     }
 
     fn add_nodeset(& mut self, nodes: &Nodeset<'n>) {
-        self.a.push_all(nodes.a.as_slice());
+        self.nodes.push_all(nodes.nodes.as_slice());
     }
 
-    fn size(&self) -> uint {
-        0
+    pub fn size(&self) -> uint {
+        self.nodes.len()
     }
 
-    fn iter(&self) -> EmptyIterator<& 'n Node> {
-        EmptyIterator
+    fn iter(&self) -> std::slice::Items<& 'n Node> {
+        self.nodes.iter()
     }
 }
 
