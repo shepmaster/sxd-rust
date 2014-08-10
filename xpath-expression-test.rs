@@ -10,7 +10,8 @@ use xpath::expression::{ExpressionAnd,
                         ExpressionEqual,
                         ExpressionNotEqual,
                         ExpressionFunction,
-                        ExpressionLiteral};
+                        ExpressionLiteral,
+                        ExpressionMath};
 use xpath::XPathFunction;
 use xpath::XPathEvaluationContext;
 
@@ -137,7 +138,7 @@ fn expression_function_evaluates_input_arguments() {
 }
 
 #[test]
-fn unknown_function_is_reported_as_an_error() {
+fn expression_function_unknown_function_is_reported_as_an_error() {
     let node = Node::new();
     let funs = HashMap::new();
     let context = XPathEvaluationContext {node: &node, functions: &funs};
@@ -145,4 +146,18 @@ fn unknown_function_is_reported_as_an_error() {
 
     expr.evaluate(&context);
     // TODO: report errors better
+}
+
+#[test]
+fn expression_math_does_basic_math() {
+    let left  = box ExpressionLiteral{value: Number(10.0)};
+    let right = box ExpressionLiteral{value: Number(5.0)};
+
+    let node = Node::new();
+    let funs = HashMap::new();
+    let context = XPathEvaluationContext {node: &node, functions: &funs};
+    let expr = ExpressionMath::multiplication(left, right);
+
+    let res = expr.evaluate(&context);
+    assert_eq!(res, Number(50.0));
 }

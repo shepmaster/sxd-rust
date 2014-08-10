@@ -101,3 +101,46 @@ impl XPathExpression for ExpressionLiteral {
         self.value.clone()
     }
 }
+
+pub struct ExpressionMath {
+    left:  Box<XPathExpression>,
+    right: Box<XPathExpression>,
+    operation: fn(f64, f64) -> f64,
+}
+
+fn      add(a: f64, b: f64) -> f64 {a + b}
+fn subtract(a: f64, b: f64) -> f64 {a - b}
+fn multiply(a: f64, b: f64) -> f64 {a * b}
+fn   divide(a: f64, b: f64) -> f64 {a / b}
+fn  modulus(a: f64, b: f64) -> f64 {a % b}
+
+impl ExpressionMath {
+    pub fn addition(left: Box<XPathExpression>, right: Box<XPathExpression>) -> ExpressionMath {
+        ExpressionMath{left: left, right: right, operation: add}
+    }
+
+    pub fn subtraction(left: Box<XPathExpression>, right: Box<XPathExpression>) -> ExpressionMath {
+        ExpressionMath{left: left, right: right, operation: subtract}
+    }
+
+    pub fn multiplication(left: Box<XPathExpression>, right: Box<XPathExpression>) -> ExpressionMath {
+        ExpressionMath{left: left, right: right, operation: multiply}
+    }
+
+    pub fn division(left: Box<XPathExpression>, right: Box<XPathExpression>) -> ExpressionMath {
+        ExpressionMath{left: left, right: right, operation: divide}
+    }
+
+    pub fn remainder(left: Box<XPathExpression>, right: Box<XPathExpression>) -> ExpressionMath {
+        ExpressionMath{left: left, right: right, operation: modulus}
+    }
+}
+
+impl XPathExpression for ExpressionMath {
+    fn evaluate(&self, context: &XPathEvaluationContext) -> XPathValue {
+        let left = self.left.evaluate(context);
+        let right = self.right.evaluate(context);
+        let op = self.operation;
+        return Number(op(left.number(), right.number()));
+    }
+}
