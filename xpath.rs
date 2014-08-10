@@ -4,13 +4,18 @@ use std::collections::HashMap;
 
 #[deriving(Show,PartialEq,Clone)]
 pub struct Node {
+    parent: Option<uint>,
     children: Vec<Node>,
     attributes: Vec<Node>,
 }
 
 impl Node {
     pub fn new() -> Node {
-        Node { children: vec!(), attributes: vec!() }
+        Node { parent: None, children: vec!(), attributes: vec!() }
+    }
+
+    pub fn new_with_parent(id: uint) -> Node {
+        Node { parent: Some(id), children: vec!(), attributes: vec!() }
     }
 
     fn parent(&self) -> &Node {
