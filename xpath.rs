@@ -81,9 +81,20 @@ pub trait XPathFunction<'n> {
 pub struct XPathEvaluationContext<'a> {
     pub node: & 'a Node,
     pub functions: & 'a HashMap<String, Box<XPathFunction<'a>>>,
+    position: uint,
 }
 
 impl<'a> XPathEvaluationContext<'a> {
+    pub fn new(node: & 'a Node,
+               functions: & 'a HashMap<String, Box<XPathFunction<'a>>>) -> XPathEvaluationContext<'a>
+    {
+        XPathEvaluationContext {
+            node: node,
+            functions: functions,
+            position: 0,
+        }
+    }
+
     fn node(&self) -> & 'a Node {
         self.node
     }
@@ -92,10 +103,16 @@ impl<'a> XPathEvaluationContext<'a> {
         XPathEvaluationContext {
             node: self.node,
             functions: self.functions,
+            position: 0,
         }
     }
 
-    fn next(&self, node: &Node) {
+    fn next(& mut self, node: &Node) {
+        self.position += 1;
+    }
+
+    fn position(&self) -> uint {
+        self.position
     }
 
     fn function_for_name(&self, name: &str) -> Option<& 'a Box<XPathFunction<'a>>> {

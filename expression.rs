@@ -180,7 +180,7 @@ impl<'n> XPathExpression<'n> for ExpressionPath<'n> {
         for step in self.steps.iter() {
             let mut step_result = Nodeset::new();
 
-            let sub_context = context.new_context_for(result.size());
+            let mut sub_context = context.new_context_for(result.size());
 
             for current_node in result.iter() {
                 sub_context.next(*current_node);

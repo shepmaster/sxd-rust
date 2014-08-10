@@ -30,7 +30,7 @@ fn expression_and_returns_logical_and() {
 
     let node = Node::new();
     let funs = HashMap::new();
-    let context = XPathEvaluationContext {node: &node, functions: &funs};
+    let context = XPathEvaluationContext::new(&node, &funs);
     let expr = ExpressionAnd{left: left, right: right};
 
     let res = expr.evaluate(&context);
@@ -45,7 +45,7 @@ fn expression_and_short_circuits_when_left_argument_is_false() {
 
     let node = Node::new();
     let funs = HashMap::new();
-    let context = XPathEvaluationContext {node: &node, functions: &funs};
+    let context = XPathEvaluationContext::new(&node, &funs);
     let expr = ExpressionAnd{left: left, right: right};
 
     expr.evaluate(&context);
@@ -59,7 +59,7 @@ fn expression_equal_compares_as_boolean_if_one_argument_is_a_boolean() {
 
     let node = Node::new();
     let funs = HashMap::new();
-    let context = XPathEvaluationContext {node: &node, functions: &funs};
+    let context = XPathEvaluationContext::new(&node, &funs);
     let expr = ExpressionEqual{left: actual_bool, right: truthy_str};
 
     let res = expr.evaluate(&context);
@@ -74,7 +74,7 @@ fn expression_equal_compares_as_number_if_one_argument_is_a_number() {
 
     let node = Node::new();
     let funs = HashMap::new();
-    let context = XPathEvaluationContext {node: &node, functions: &funs};
+    let context = XPathEvaluationContext::new(&node, &funs);
     let expr = ExpressionEqual{left: number_str, right: actual_number};
 
     let res = expr.evaluate(&context);
@@ -88,7 +88,7 @@ fn expression_equal_compares_as_string_otherwise() {
 
     let node = Node::new();
     let funs = HashMap::new();
-    let context = XPathEvaluationContext {node: &node, functions: &funs};
+    let context = XPathEvaluationContext::new(&node, &funs);
     let expr = ExpressionEqual{left: a_str, right: b_str};
 
     let res = expr.evaluate(&context);
@@ -102,7 +102,7 @@ fn expression_not_equal_negates_equality() {
 
     let node = Node::new();
     let funs = HashMap::new();
-    let context = XPathEvaluationContext {node: &node, functions: &funs};
+    let context = XPathEvaluationContext::new(&node, &funs);
     let expr = ExpressionNotEqual::new(a_str, b_str);
 
     let res = expr.evaluate(&context);
@@ -130,7 +130,7 @@ fn expression_function_evaluates_input_arguments() {
     let node = Node::new();
     let mut funs: HashMap<String, Box<XPathFunction>> = HashMap::new();
     funs.insert("test-fn".to_string(), fun);
-    let context = XPathEvaluationContext {node: &node, functions: &funs};
+    let context = XPathEvaluationContext::new(&node, &funs);
     let expr = ExpressionFunction{name: "test-fn".to_string(), arguments: vec!(arg_expr)};
 
     let res = expr.evaluate(&context);
@@ -141,7 +141,7 @@ fn expression_function_evaluates_input_arguments() {
 fn expression_function_unknown_function_is_reported_as_an_error() {
     let node = Node::new();
     let funs = HashMap::new();
-    let context = XPathEvaluationContext {node: &node, functions: &funs};
+    let context = XPathEvaluationContext::new(&node, &funs);
     let expr = ExpressionFunction{name: "unknown-fn".to_string(), arguments: vec!()};
 
     expr.evaluate(&context);
@@ -155,7 +155,7 @@ fn expression_math_does_basic_math() {
 
     let node = Node::new();
     let funs = HashMap::new();
-    let context = XPathEvaluationContext {node: &node, functions: &funs};
+    let context = XPathEvaluationContext::new(&node, &funs);
     let expr = ExpressionMath::multiplication(left, right);
 
     let res = expr.evaluate(&context);
