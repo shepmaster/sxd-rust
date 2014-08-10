@@ -144,3 +144,14 @@ impl XPathExpression for ExpressionMath {
         return Number(op(left.number(), right.number()));
     }
 }
+
+pub struct ExpressionNegation {
+    expression: Box<XPathExpression>,
+}
+
+impl XPathExpression for ExpressionNegation {
+    fn evaluate(&self, context: &XPathEvaluationContext) -> XPathValue {
+        let result = self.expression.evaluate(context);
+        return Number(-result.number());
+    }
+}
