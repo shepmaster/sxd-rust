@@ -8,6 +8,7 @@ pub struct Document {
     /// Storage for each maintained type
     elements: Vec<Element>,
     attributes: Vec<Attribute>,
+    texts: Vec<Text>,
 
     // Primary associations between nodes
     children: HashMap<Parent, Vec<Child>>,
@@ -21,6 +22,8 @@ pub struct Document {
 pub struct ElementNode   { i: uint }
 #[deriving(Show,Eq,PartialEq,Hash,Clone)]
 pub struct AttributeNode { i: uint }
+#[deriving(Show,Eq,PartialEq,Hash,Clone)]
+pub struct TextNode      { i: uint }
 
 #[deriving(Show,Eq,PartialEq,Hash,Clone)]
 pub enum Parent {
@@ -46,12 +49,21 @@ impl ToParent for ElementNode {
 #[deriving(Show,Eq,PartialEq,Hash,Clone)]
 pub enum Child {
     ElementChild(ElementNode),
+    TextChild(TextNode),
 }
 
 impl Child {
     pub fn element(&self) -> Option<ElementNode> {
         match self {
             &ElementChild(e) => Some(e),
+            _ => None,
+        }
+    }
+
+    pub fn text(&self) -> Option<TextNode> {
+        match self {
+            &TextChild(t) => Some(t),
+            _ => None,
         }
     }
 }
@@ -64,11 +76,16 @@ impl ToChild for ElementNode {
     fn to_child(&self) -> Child { ElementChild(*self) }
 }
 
+impl ToChild for TextNode {
+    fn to_child(&self) -> Child { TextChild(*self) }
+}
+
 impl Document {
     pub fn new() -> Document {
         Document {
             elements: Vec::new(),
             attributes: Vec::new(),
+            texts: Vec::new(),
             children: HashMap::new(),
             parents: HashMap::new(),
             assigned_attributes: HashMap::new(),
@@ -81,6 +98,10 @@ impl Document {
 
     fn next_attribute_ref(& self) -> AttributeNode {
         AttributeNode{i: self.attributes.len()}
+    }
+
+    fn next_text_ref(& self) -> TextNode {
+        TextNode{i: self.texts.len()}
     }
 
     pub fn new_element(&mut self, name: &str) -> ElementNode {
@@ -100,6 +121,14 @@ impl Document {
         aref
     }
 
+    fn new_text(&mut self, value: &str) -> TextNode {
+        let tref = self.next_text_ref();
+        self.texts.push(Text {
+            value: value.to_string(),
+        });
+        tref
+    }
+
     pub fn element<'a>(&'a self, element: ElementNode) -> &'a Element {
         &self.elements[element.i]
     }
@@ -115,6 +144,11 @@ impl Document {
     fn mut_attribute<'a>(&'a mut self, attribute: AttributeNode) -> &'a mut Attribute {
         self.attributes.get_mut(attribute.i)
     }
+
+    fn text<'a>(&'a self, text: TextNode) -> &'a Text {
+        &self.texts[text.i]
+    }
+
 
     fn attribute_for(&self, element: ElementNode, name: &str) -> Option<AttributeNode> {
         match self.assigned_attributes.find(&element) {
@@ -216,7 +250,17 @@ pub struct Attribute {
     value: String,
 }
 
-pub struct Text;
+#[deriving(Show)]
+pub struct Text {
+    value: String,
+}
+
+impl Text {
+    pub fn value(&self) -> &str {
+        self.value.as_slice()
+    }
+}
+
 pub struct Comment;
 pub struct Root;
 
@@ -318,4 +362,19 @@ fn attributes_can_be_reset() {
 
     let val = d.get_attribute(alpha, "hello").unwrap();
     assert_eq!(val, "universe");
+}
+
+#[test]
+fn elements_can_have_text_children() {
+    let mut d = Document::new();
+    let sentence = d.new_element("sentence");
+    let text = d.new_text("Now is the winter of our discontent.");
+
+    d.append_child(sentence, text);
+
+    let children = d.children(sentence);
+    assert_eq!(1, children.len());
+
+    let child_text = children[0].text().unwrap();
+    assert_eq!(d.text(child_text).value(), "Now is the winter of our discontent.");
 }
