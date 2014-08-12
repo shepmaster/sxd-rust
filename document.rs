@@ -10,17 +10,58 @@ pub struct Document {
     attributes: Vec<Attribute>,
 
     // Primary associations between nodes
-    children: HashMap<Node, Vec<Node>>,
-    parents: HashMap<Node, Node>,
+    children: HashMap<Parent, Vec<Child>>,
+    parents: HashMap<Child, Parent>,
 
     // Associated attributes
-    assigned_attributes: HashMap<Node, HashSet<Node>>,
+    assigned_attributes: HashMap<ElementNode, HashSet<AttributeNode>>,
 }
 
 #[deriving(Show,Eq,PartialEq,Hash,Clone)]
-pub enum Node {
-    ElementNode(uint),
-    AttributeNode(uint),
+pub struct ElementNode   { i: uint }
+#[deriving(Show,Eq,PartialEq,Hash,Clone)]
+pub struct AttributeNode { i: uint }
+
+#[deriving(Show,Eq,PartialEq,Hash,Clone)]
+pub enum Parent {
+    ElementParent(ElementNode),
+}
+
+impl Parent {
+    pub fn element(&self) -> Option<ElementNode> {
+        match self {
+            &ElementParent(e) => Some(e),
+        }
+    }
+}
+
+pub trait ToParent {
+    fn to_parent(&self) -> Parent;
+}
+
+impl ToParent for ElementNode {
+    fn to_parent(&self) -> Parent { ElementParent(*self) }
+}
+
+#[deriving(Show,Eq,PartialEq,Hash,Clone)]
+pub enum Child {
+    ElementChild(ElementNode),
+}
+
+impl Child {
+    pub fn element(&self) -> Option<ElementNode> {
+        match self {
+            &ElementChild(e) => Some(e),
+        }
+    }
+}
+
+pub trait ToChild {
+    fn to_child(&self) -> Child;
+}
+
+impl ToChild for ElementNode {
+    fn to_child(&self) -> Child { ElementChild(*self) }
 }
 
 impl Document {
@@ -34,15 +75,15 @@ impl Document {
         }
     }
 
-    fn next_element_ref(& self) -> Node {
-        ElementNode(self.elements.len())
+    fn next_element_ref(& self) -> ElementNode {
+        ElementNode{i: self.elements.len()}
     }
 
-    fn next_attribute_ref(& self) -> Node {
-        AttributeNode(self.attributes.len())
+    fn next_attribute_ref(& self) -> AttributeNode {
+        AttributeNode{i: self.attributes.len()}
     }
 
-    pub fn new_element(&mut self, name: &str) -> Node {
+    pub fn new_element(&mut self, name: &str) -> ElementNode {
         let eref = self.next_element_ref();
         self.elements.push(Element {
             name: name.to_string(),
@@ -50,7 +91,7 @@ impl Document {
         eref
     }
 
-    fn new_attribute(&mut self, name: &str, value: &str) -> Node {
+    fn new_attribute(&mut self, name: &str, value: &str) -> AttributeNode {
         let aref = self.next_attribute_ref();
         self.attributes.push(Attribute {
             name: name.to_string(),
@@ -59,35 +100,23 @@ impl Document {
         aref
     }
 
-    pub fn element<'a>(&'a self, element: Node) -> &'a Element {
-        match element {
-            ElementNode(i) => &self.elements[i],
-            _ => fail!("Not an element"),
-        }
+    pub fn element<'a>(&'a self, element: ElementNode) -> &'a Element {
+        &self.elements[element.i]
     }
 
-    pub fn mut_element<'a>(&'a mut self, element: Node) -> &'a mut Element {
-        match element {
-            ElementNode(i) => self.elements.get_mut(i),
-            _ => fail!("Not an element"),
-        }
+    pub fn mut_element<'a>(&'a mut self, element: ElementNode) -> &'a mut Element {
+        self.elements.get_mut(element.i)
     }
 
-    fn attribute<'a>(&'a self, attribute: Node) -> &'a Attribute {
-        match attribute {
-            AttributeNode(i) => &self.attributes[i],
-            _ => fail!("Not an attribute"),
-        }
+    fn attribute<'a>(&'a self, attribute: AttributeNode) -> &'a Attribute {
+        &self.attributes[attribute.i]
     }
 
-    fn mut_attribute<'a>(&'a mut self, attribute: Node) -> &'a mut Attribute {
-        match attribute {
-            AttributeNode(i) => self.attributes.get_mut(i),
-            _ => fail!("Not an attribute"),
-        }
+    fn mut_attribute<'a>(&'a mut self, attribute: AttributeNode) -> &'a mut Attribute {
+        self.attributes.get_mut(attribute.i)
     }
 
-    fn attribute_for(&self, element: Node, name: &str) -> Option<Node> {
+    fn attribute_for(&self, element: ElementNode, name: &str) -> Option<AttributeNode> {
         match self.assigned_attributes.find(&element) {
             Some(ref attributes) => {
                 let mut node_attrs = attributes.iter().map(|node| (node, self.attribute(*node)));
@@ -100,14 +129,14 @@ impl Document {
         }
     }
 
-    pub fn get_attribute(&self, element: Node, name: &str) -> Option<&str> {
+    pub fn get_attribute(&self, element: ElementNode, name: &str) -> Option<&str> {
         match self.attribute_for(element, name) {
             Some(aref) => Some(self.attribute(aref).value.as_slice()),
             None => None,
         }
     }
 
-    pub fn set_attribute(&mut self, element: Node, name: &str, value: &str) -> Node {
+    pub fn set_attribute(&mut self, element: ElementNode, name: &str, value: &str) -> AttributeNode {
         match self.attribute_for(element, name) {
             Some(aref) => {
                 self.mut_attribute(aref).value = value.to_string();
@@ -122,7 +151,7 @@ impl Document {
         }
     }
 
-    fn remove_parentage(&mut self, child: Node) {
+    fn remove_parentage(&mut self, child: Child) {
         match self.parent(child) {
             Some(ref parent) => {
                 match self.children.find_mut(parent) {
@@ -139,7 +168,10 @@ impl Document {
         }
     }
 
-    pub fn append_child(&mut self, parent: Node, child: Node) {
+    pub fn append_child<P: ToParent, C: ToChild>(&mut self, parent: P, child: C) {
+        let parent = parent.to_parent();
+        let child = child.to_child();
+
         {
             let kids = self.children.find_or_insert(parent, Vec::new());
             kids.push(child);
@@ -149,14 +181,16 @@ impl Document {
         self.parents.insert(child, parent);
     }
 
-    pub fn children(&self, parent: Node) -> Vec<Node> {
+    pub fn children<P: ToParent>(&self, parent: P) -> Vec<Child> {
+        let parent = parent.to_parent();
+
         match self.children.find(&parent) {
             Some(v) => v.iter().map(|r| r.clone()).collect(),
             None => vec![],
         }
     }
 
-    pub fn parent(&self, child: Node) -> Option<Node> {
+    pub fn parent(&self, child: Child) -> Option<Parent> {
         self.parents.find_copy(&child)
     }
 }
@@ -197,7 +231,8 @@ fn can_add_an_element_as_a_child() {
     let children = d.children(alpha);
     assert_eq!(1, children.len());
 
-    let result = d.element(children[0]);
+    let child_elem = children[0].element().unwrap();
+    let result = d.element(child_elem);
     assert_eq!(result.name(), "beta");
 }
 
@@ -213,8 +248,10 @@ fn children_are_ordered() {
     let children = d.children(greek);
 
     assert_eq!(2, children.len());
-    assert_eq!(d.element(children[0]).name(), "alpha");
-    assert_eq!(d.element(children[1]).name(), "omega");
+    let child_elem1 = children[0].element().unwrap();
+    let child_elem2 = children[1].element().unwrap();
+    assert_eq!(d.element(child_elem1).name(), "alpha");
+    assert_eq!(d.element(child_elem2).name(), "omega");
 }
 
 #[test]
@@ -228,7 +265,8 @@ fn children_know_their_parent() {
     let child = d.children(alpha)[0];
     let parent = d.parent(child).unwrap();
 
-    let result = d.element(parent);
+    let parent_elem = parent.element().unwrap();
+    let result = d.element(parent_elem);
     assert_eq!(result.name(), "alpha");
 }
 
