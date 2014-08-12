@@ -10,7 +10,7 @@ pub struct Document {
     attributes: Vec<Attribute>,
 
     // Primary associations between nodes
-    children: HashMap<Node, HashSet<Node>>, // Needs order!
+    children: HashMap<Node, Vec<Node>>,
     parents: HashMap<Node, Node>,
 
     // Associated attributes
@@ -126,7 +126,12 @@ impl Document {
         match self.parent(child) {
             Some(ref parent) => {
                 match self.children.find_mut(parent) {
-                    Some(children) => { children.remove(&child); },
+                    Some(children) => {
+                        match children.as_slice().position_elem(&child) {
+                            Some(idx) => { children.remove(idx); },
+                            None => {},
+                        }
+                    },
                     None => {},
                 }
             },
@@ -136,8 +141,8 @@ impl Document {
 
     pub fn append_child(&mut self, parent: Node, child: Node) {
         {
-            let kids = self.children.find_or_insert(parent, HashSet::new());
-            kids.insert(child);
+            let kids = self.children.find_or_insert(parent, Vec::new());
+            kids.push(child);
         }
 
         self.remove_parentage(child);
@@ -194,6 +199,22 @@ fn can_add_an_element_as_a_child() {
 
     let result = d.element(children[0]);
     assert_eq!(result.name(), "beta");
+}
+
+#[test]
+fn children_are_ordered() {
+    let mut d = Document::new();
+    let greek = d.new_element("greek");
+    let alpha = d.new_element("alpha");
+    let omega = d.new_element("omega");
+
+    d.append_child(greek, alpha);
+    d.append_child(greek, omega);
+    let children = d.children(greek);
+
+    assert_eq!(2, children.len());
+    assert_eq!(d.element(children[0]).name(), "alpha");
+    assert_eq!(d.element(children[1]).name(), "omega");
 }
 
 #[test]
