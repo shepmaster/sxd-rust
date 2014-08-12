@@ -149,6 +149,9 @@ impl Document {
         &self.texts[text.i]
     }
 
+    fn mut_text<'a>(&'a mut self, text: TextNode) -> &'a mut Text {
+        self.texts.get_mut(text.i)
+    }
 
     fn attribute_for(&self, element: ElementNode, name: &str) -> Option<AttributeNode> {
         match self.assigned_attributes.find(&element) {
@@ -258,6 +261,10 @@ pub struct Text {
 impl Text {
     pub fn value(&self) -> &str {
         self.value.as_slice()
+    }
+
+    pub fn set_value(& mut self, value: &str) {
+        self.value = value.to_string()
     }
 }
 
@@ -377,4 +384,15 @@ fn elements_can_have_text_children() {
 
     let child_text = children[0].text().unwrap();
     assert_eq!(d.text(child_text).value(), "Now is the winter of our discontent.");
+}
+
+#[test]
+fn text_can_be_changed() {
+    let mut d = Document::new();
+    let text = d.new_text("Now is the winter of our discontent.");
+
+    let text_data = d.mut_text(text);
+    text_data.set_value("Made glorious summer by this sun of York");
+
+    assert_eq!(text_data.value(), "Made glorious summer by this sun of York");
 }
