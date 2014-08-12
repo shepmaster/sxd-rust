@@ -14,7 +14,7 @@ pub struct Document {
     parents: HashMap<Node, Node>,
 
     // Associated attributes
-    attrs: HashMap<Node, HashSet<Node>>,
+    assigned_attributes: HashMap<Node, HashSet<Node>>,
 }
 
 #[deriving(Show,Eq,PartialEq,Hash,Clone)]
@@ -30,12 +30,16 @@ impl Document {
             attributes: Vec::new(),
             children: HashMap::new(),
             parents: HashMap::new(),
-            attrs: HashMap::new(),
+            assigned_attributes: HashMap::new(),
         }
     }
 
     fn next_element_ref(& self) -> Node {
         ElementNode(self.elements.len())
+    }
+
+    fn next_attribute_ref(& self) -> Node {
+        AttributeNode(self.attributes.len())
     }
 
     pub fn new_element(&mut self, name: &str) -> Node {
@@ -44,6 +48,15 @@ impl Document {
             name: name.to_string(),
         });
         eref
+    }
+
+    fn new_attribute(&mut self, name: &str, value: &str) -> Node {
+        let aref = self.next_attribute_ref();
+        self.attributes.push(Attribute {
+            name: name.to_string(),
+            value: value.to_string(),
+        });
+        aref
     }
 
     pub fn element<'a>(&'a self, element: Node) -> &'a Element {
@@ -60,23 +73,26 @@ impl Document {
         }
     }
 
-    fn next_attribute_ref(& self) -> Node {
-        AttributeNode(self.attributes.len())
-    }
-
-    pub fn attribute<'a>(&'a self, attribute: Node) -> &'a Attribute {
+    fn attribute<'a>(&'a self, attribute: Node) -> &'a Attribute {
         match attribute {
             AttributeNode(i) => &self.attributes[i],
             _ => fail!("Not an attribute"),
         }
     }
 
-    pub fn get_attribute(&self, element: Node, name: &str) -> Option<&str> {
-        match self.attrs.find(&element) {
-            Some(ref attrs) => {
-                let mut real_attrs = attrs.iter().map(|node| self.attribute(*node));
-                match real_attrs.find(|attr| attr.name.as_slice() == name) {
-                    Some(ref attr) => Some(attr.value.as_slice()),
+    fn mut_attribute<'a>(&'a mut self, attribute: Node) -> &'a mut Attribute {
+        match attribute {
+            AttributeNode(i) => self.attributes.get_mut(i),
+            _ => fail!("Not an attribute"),
+        }
+    }
+
+    fn attribute_for(&self, element: Node, name: &str) -> Option<Node> {
+        match self.assigned_attributes.find(&element) {
+            Some(ref attributes) => {
+                let mut node_attrs = attributes.iter().map(|node| (node, self.attribute(*node)));
+                match node_attrs.find(|&(_, attr)| attr.name.as_slice() == name) {
+                    Some((node, _)) => Some(*node),
                     None => None,
                 }
             },
@@ -84,20 +100,26 @@ impl Document {
         }
     }
 
+    pub fn get_attribute(&self, element: Node, name: &str) -> Option<&str> {
+        match self.attribute_for(element, name) {
+            Some(aref) => Some(self.attribute(aref).value.as_slice()),
+            None => None,
+        }
+    }
+
     pub fn set_attribute(&mut self, element: Node, name: &str, value: &str) -> Node {
-
-        // modify existing first
-
-        let aref = self.next_attribute_ref();
-        self.attributes.push(Attribute {
-            name: name.to_string(),
-            value: value.to_string(),
-        });
-
-        let attrs = self.attrs.find_or_insert(element, HashSet::new());
-        attrs.insert(aref);
-
-        aref
+        match self.attribute_for(element, name) {
+            Some(aref) => {
+                self.mut_attribute(aref).value = value.to_string();
+                aref
+            },
+            None => {
+                let aref = self.new_attribute(name, value);
+                let assigned_attributes = self.assigned_attributes.find_or_insert(element, HashSet::new());
+                assigned_attributes.insert(aref);
+                aref
+            },
+        }
     }
 
     fn remove_parentage(&mut self, child: Node) {
@@ -225,4 +247,16 @@ fn elements_have_attributes() {
     d.set_attribute(alpha, "hello", "world");
     let val = d.get_attribute(alpha, "hello").unwrap();
     assert_eq!(val, "world");
+}
+
+#[test]
+fn attributes_can_be_reset() {
+    let mut d = Document::new();
+    let alpha = d.new_element("alpha");
+
+    d.set_attribute(alpha, "hello", "world");
+    d.set_attribute(alpha, "hello", "universe");
+
+    let val = d.get_attribute(alpha, "hello").unwrap();
+    assert_eq!(val, "universe");
 }
