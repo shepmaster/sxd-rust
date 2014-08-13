@@ -319,6 +319,10 @@ impl Nodeset {
         self.nodes.push(node.to_any());
     }
 
+    fn add_nodeset(& mut self, nodes: &Nodeset) {
+        self.nodes.push_all(nodes.nodes.as_slice());
+    }
+
     pub fn size(&self) -> uint {
         self.nodes.len()
     }
@@ -472,4 +476,25 @@ fn nodeset_can_include_all_node_types() {
     assert_eq!(e, node_vec[0].element().unwrap());
     assert_eq!(a, node_vec[1].attribute().unwrap());
     assert_eq!(t, node_vec[2].text().unwrap());
+}
+
+#[test]
+fn nodesets_can_be_combined() {
+    let mut all_nodes = Nodeset::new();
+    let mut nodes1 = Nodeset::new();
+    let mut nodes2 = Nodeset::new();
+
+    let mut d = Document::new();
+    let e1 = d.new_element("element1");
+    let e2 = d.new_element("element2");
+
+    all_nodes.add(e1);
+    all_nodes.add(e2);
+
+    nodes1.add(e1);
+    nodes2.add(e2);
+
+    nodes1.add_nodeset(&nodes2);
+
+    assert_eq!(all_nodes, nodes1);
 }
