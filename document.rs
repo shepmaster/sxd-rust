@@ -154,6 +154,13 @@ impl Document {
         }
     }
 
+    pub fn attributes(&self, element: ElementNode) -> Vec<AttributeNode> {
+        match self.assigned_attributes.find(&element) {
+            Some(ref attrs) => attrs.iter().map(|a| a.clone()).collect(),
+            None => vec![],
+        }
+    }
+
     pub fn get_attribute(&self, element: ElementNode, name: &str) -> Option<&str> {
         match self.attribute_for(element, name) {
             Some(aref) => Some(self.attribute(aref).value.as_slice()),
@@ -239,6 +246,11 @@ impl Element {
 pub struct Attribute {
     name: String,
     value: String,
+}
+
+impl Attribute {
+    pub fn name(&self)  -> &str { self.name.as_slice() }
+    pub fn value(&self) -> &str { self.value.as_slice() }
 }
 
 #[deriving(Show)]
@@ -430,6 +442,24 @@ fn attributes_can_be_reset() {
 
     let val = d.get_attribute(alpha, "hello").unwrap();
     assert_eq!(val, "universe");
+}
+
+#[test]
+fn attributes_can_be_iterated() {
+    let mut d = Document::new();
+    let e = d.new_element("element");
+
+    d.set_attribute(e, "name1", "value1");
+    d.set_attribute(e, "name2", "value2");
+
+    let mut attrs: Vec<&Attribute> = d.attributes(e).iter().map(|a| d.attribute(*a)).collect();
+    attrs.sort_by(|a, b| a.name.cmp(&b.name));
+
+    assert_eq!(2, attrs.len());
+    assert_eq!("name1",  attrs[0].name());
+    assert_eq!("value1", attrs[0].value());
+    assert_eq!("name2",  attrs[1].name());
+    assert_eq!("value2", attrs[1].value());
 }
 
 #[test]
