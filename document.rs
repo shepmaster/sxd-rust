@@ -92,20 +92,8 @@ impl Document {
         }
     }
 
-    fn next_element_ref(& self) -> ElementNode {
-        ElementNode{i: self.elements.len()}
-    }
-
-    fn next_attribute_ref(& self) -> AttributeNode {
-        AttributeNode{i: self.attributes.len()}
-    }
-
-    fn next_text_ref(& self) -> TextNode {
-        TextNode{i: self.texts.len()}
-    }
-
     pub fn new_element(&mut self, name: &str) -> ElementNode {
-        let eref = self.next_element_ref();
+        let eref = ElementNode{i: self.elements.len()};
         self.elements.push(Element {
             name: name.to_string(),
         });
@@ -113,7 +101,7 @@ impl Document {
     }
 
     fn new_attribute(&mut self, name: &str, value: &str) -> AttributeNode {
-        let aref = self.next_attribute_ref();
+        let aref = AttributeNode{i: self.attributes.len()} ;
         self.attributes.push(Attribute {
             name: name.to_string(),
             value: value.to_string(),
@@ -122,7 +110,7 @@ impl Document {
     }
 
     fn new_text(&mut self, value: &str) -> TextNode {
-        let tref = self.next_text_ref();
+        let tref = TextNode{i: self.texts.len()};
         self.texts.push(Text {
             value: value.to_string(),
         });
