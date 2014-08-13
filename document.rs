@@ -42,6 +42,10 @@ pub trait ToParent {
     fn to_parent(&self) -> Parent;
 }
 
+impl ToParent for Parent {
+    fn to_parent(&self) -> Parent { *self }
+}
+
 impl ToParent for ElementNode {
     fn to_parent(&self) -> Parent { ElementParent(*self) }
 }
@@ -70,6 +74,10 @@ impl Child {
 
 pub trait ToChild {
     fn to_child(&self) -> Child;
+}
+
+impl ToChild for Child {
+    fn to_child(&self) -> Child { *self }
 }
 
 impl ToChild for ElementNode {
@@ -303,6 +311,10 @@ impl Any {
 
 pub trait ToAny {
     fn to_any(&self) -> Any;
+}
+
+impl ToAny for Any {
+    fn to_any(&self) -> Any { *self }
 }
 
 impl ToAny for ElementNode {
