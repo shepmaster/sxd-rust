@@ -117,7 +117,7 @@ impl Document {
         aref
     }
 
-    fn new_text(&mut self, value: &str) -> TextNode {
+    pub fn new_text(&mut self, value: &str) -> TextNode {
         let tref = TextNode{i: self.texts.len()};
         self.texts.push(Text {
             value: value.to_string(),
@@ -141,11 +141,11 @@ impl Document {
         self.attributes.get_mut(attribute.i)
     }
 
-    fn text<'a>(&'a self, text: TextNode) -> &'a Text {
+    pub fn text<'a>(&'a self, text: TextNode) -> &'a Text {
         &self.texts[text.i]
     }
 
-    fn mut_text<'a>(&'a mut self, text: TextNode) -> &'a mut Text {
+    pub fn mut_text<'a>(&'a mut self, text: TextNode) -> &'a mut Text {
         self.texts.get_mut(text.i)
     }
 
@@ -287,21 +287,21 @@ pub enum Any {
 }
 
 impl Any {
-    fn element(&self) -> Option<ElementNode> {
+    pub fn element(&self) -> Option<ElementNode> {
         match self {
             &ElementAny(e) => Some(e),
             _ => None,
         }
     }
 
-    fn attribute(&self) -> Option<AttributeNode> {
+    pub fn attribute(&self) -> Option<AttributeNode> {
         match self {
             &AttributeAny(e) => Some(e),
             _ => None,
         }
     }
 
-    fn text(&self) -> Option<TextNode> {
+    pub fn text(&self) -> Option<TextNode> {
         match self {
             &TextAny(e) => Some(e),
             _ => None,
@@ -360,7 +360,7 @@ impl Nodeset {
         self.nodes.push(node.to_any());
     }
 
-    fn add_nodeset(& mut self, nodes: &Nodeset) {
+    pub fn add_nodeset(& mut self, nodes: &Nodeset) {
         self.nodes.push_all(nodes.nodes.as_slice());
     }
 
@@ -368,7 +368,7 @@ impl Nodeset {
         self.nodes.len()
     }
 
-    fn iter(&self) -> std::slice::Items<Any> {
+    pub fn iter(&self) -> std::slice::Items<Any> {
         self.nodes.iter()
     }
 }
