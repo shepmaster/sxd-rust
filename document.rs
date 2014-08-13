@@ -329,6 +329,23 @@ impl ToAny for TextNode {
     fn to_any(&self) -> Any { TextAny(*self) }
 }
 
+impl ToAny for Child {
+    fn to_any(&self) -> Any {
+        match self {
+            &ElementChild(e) => ElementAny(e),
+            &TextChild(e)    => TextAny(e),
+        }
+    }
+}
+
+impl ToAny for Parent {
+    fn to_any(&self) -> Any {
+        match self {
+            &ElementParent(e) => ElementAny(e),
+        }
+    }
+}
+
 #[deriving(Show,PartialEq,Clone)]
 pub struct Nodeset {
     nodes: Vec<Any>,
