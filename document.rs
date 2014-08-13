@@ -259,6 +259,75 @@ impl Text {
 pub struct Comment;
 pub struct Root;
 
+#[deriving(Show,Eq,PartialEq,Hash,Clone)]
+pub enum Any {
+    ElementAny(ElementNode),
+    AttributeAny(AttributeNode),
+    TextAny(TextNode),
+}
+
+impl Any {
+    fn element(&self) -> Option<ElementNode> {
+        match self {
+            &ElementAny(e) => Some(e),
+            _ => None,
+        }
+    }
+
+    fn attribute(&self) -> Option<AttributeNode> {
+        match self {
+            &AttributeAny(e) => Some(e),
+            _ => None,
+        }
+    }
+
+    fn text(&self) -> Option<TextNode> {
+        match self {
+            &TextAny(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
+pub trait ToAny {
+    fn to_any(&self) -> Any;
+}
+
+impl ToAny for ElementNode {
+    fn to_any(&self) -> Any { ElementAny(*self) }
+}
+
+impl ToAny for AttributeNode {
+    fn to_any(&self) -> Any { AttributeAny(*self) }
+}
+
+impl ToAny for TextNode {
+    fn to_any(&self) -> Any { TextAny(*self) }
+}
+
+#[deriving(Show,PartialEq,Clone)]
+pub struct Nodeset {
+    nodes: Vec<Any>,
+}
+
+impl Nodeset {
+    pub fn new() -> Nodeset {
+        Nodeset{nodes: Vec::new()}
+    }
+
+    pub fn add<N: ToAny>(& mut self, node: N) {
+        self.nodes.push(node.to_any());
+    }
+
+    pub fn size(&self) -> uint {
+        self.nodes.len()
+    }
+
+    fn iter(&self) -> std::slice::Items<Any> {
+        self.nodes.iter()
+    }
+}
+
 #[test]
 fn can_add_an_element_as_a_child() {
     let mut d = Document::new();
@@ -383,4 +452,24 @@ fn text_can_be_changed() {
     text_data.set_value("Made glorious summer by this sun of York");
 
     assert_eq!(text_data.value(), "Made glorious summer by this sun of York");
+}
+
+#[test]
+fn nodeset_can_include_all_node_types() {
+    let mut nodes = Nodeset::new();
+    let mut d = Document::new();
+    let e = d.new_element("element");
+    let a = d.set_attribute(e, "name", "value");
+    let t = d.new_text("text");
+
+    nodes.add(e);
+    nodes.add(a);
+    nodes.add(t);
+
+    let node_vec: Vec<&Any> = nodes.iter().collect();
+
+    assert_eq!(3, node_vec.len());
+    assert_eq!(e, node_vec[0].element().unwrap());
+    assert_eq!(a, node_vec[1].attribute().unwrap());
+    assert_eq!(t, node_vec[2].text().unwrap());
 }
