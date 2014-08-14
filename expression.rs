@@ -1,7 +1,10 @@
+extern crate document;
+
+use document::Nodeset;
+
 use super::XPathEvaluationContext;
 use super::XPathValue;
 use super::{Boolean,Number,String,Nodes};
-use super::Nodeset;
 
 pub trait XPathExpression<'n> {
     fn evaluate(& self, context: &XPathEvaluationContext<'n>) -> XPathValue<'n>;

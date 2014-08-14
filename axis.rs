@@ -1,6 +1,12 @@
+extern crate document;
+
+use document::Nodeset;
+use document::{Any,ElementAny,AttributeAny,TextAny};
+use document::{Parent,ElementParent};
+use document::{ElementChild};
+
 use super::XPathEvaluationContext;
 use super::XPathNodeTest;
-use super::Nodeset;
 
 enum PrincipalNodeType {
   Attribute,
@@ -30,16 +36,32 @@ impl XPathAxis for AxisAttribute {
                     node_test: &XPathNodeTest,
                     result:    &mut Nodeset)
     {
-        for attr in context.node().attributes() {
-            let mut attr_context = context.new_context_for(1);
-            attr_context.next(attr);
+        let d = context.document;
+        let n = context.node;
 
-            node_test.test(&attr_context, result);
+        match n {
+            ElementAny(e) => {
+                for attr in d.attributes(e).iter() {
+                    let mut attr_context = context.new_context_for(1);
+                    attr_context.next(*attr);
+
+                    node_test.test(&attr_context, result);
+                }
+            },
+            _ => {}
         }
     }
 
     fn principal_node_type() -> PrincipalNodeType {
         Attribute
+    }
+}
+
+fn maybe_parent(node: Any) -> Option<Parent> {
+    match node {
+        ElementAny(e) => Some(ElementParent(e)),
+        AttributeAny(_) |
+        TextAny(_) => None,
     }
 }
 
@@ -51,11 +73,19 @@ impl XPathAxis for AxisChild {
                     node_test: &XPathNodeTest,
                     result:    &mut Nodeset)
     {
-        for child in context.node().children() {
-            let mut child_context = context.new_context_for(1);
-            child_context.next(child);
+        let d = context.document;
+        let n = context.node;
 
-            node_test.test(&child_context, result);
+        match maybe_parent(n) {
+            Some(parent) => {
+                for child in d.children(parent).iter() {
+                    let mut child_context = context.new_context_for(1);
+                    child_context.next(*child);
+
+                    node_test.test(&child_context, result);
+                }
+            },
+            None => {}
         }
     }
 }
@@ -68,12 +98,20 @@ impl XPathAxis for AxisDescendant {
                     node_test: &XPathNodeTest,
                     result:    &mut Nodeset)
     {
-        for child in context.node().children() {
-            let mut child_context = context.new_context_for(1);
-            child_context.next(child);
+        let d = context.document;
+        let n = context.node;
 
-            node_test.test(&child_context, result);
-            self.select_nodes(&child_context, node_test, result);
+        match maybe_parent(n) {
+            Some(parent) => {
+                for child in d.children(parent).iter() {
+                    let mut child_context = context.new_context_for(1);
+                    child_context.next(*child);
+
+                    node_test.test(&child_context, result);
+                    self.select_nodes(&child_context, node_test, result);
+                }
+            },
+            None => {}
         }
     }
 }
@@ -101,10 +139,27 @@ impl XPathAxis for AxisParent {
                     node_test: &XPathNodeTest,
                     result:    &mut Nodeset)
     {
-        let mut parent_context = context.new_context_for(1);
-        parent_context.next(context.node().parent());
+        let d = context.document;
+        let n = context.node;
 
-        node_test.test(&parent_context, result);
+        // Comments and text nodes and PIs all live in the
+        // parent<->children section, but attributes are special and
+        // need something special.
+
+        let parent = match n {
+            ElementAny(e) => d.parent(e),
+            TextAny(e) => d.parent(e),
+            AttributeAny(a) => d.attribute_parent(a).map(|e| ElementParent(e)),
+        };
+
+        match parent {
+            Some(p) => {
+                let mut parent_context = context.new_context_for(1);
+                parent_context.next(p);
+                node_test.test(&parent_context, result);
+            },
+            None => {}
+        }
     }
 }
 

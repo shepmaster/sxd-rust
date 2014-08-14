@@ -4,7 +4,7 @@ libdocument.rlib: document.rs
 	rustc -g --crate-type=lib document.rs
 
 libxpath.rlib: xpath.rs tokenizer.rs deabbreviator.rs token.rs disambiguator.rs axis.rs expression.rs
-	rustc -g --crate-type=lib xpath.rs
+	rustc -g --crate-type=lib -L . xpath.rs
 
 document: document.rs
 	rustc -g --crate-type=lib --test document.rs

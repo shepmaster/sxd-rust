@@ -1,43 +1,17 @@
 #![crate_name = "xpath"]
 
+extern crate document;
+
+use document::{Any,ToAny};
+use document::{Document,Nodeset};
 use std::collections::HashMap;
-
-#[deriving(Show,PartialEq,Clone)]
-pub struct Node {
-    parent: Option<uint>,
-    children: Vec<Node>,
-    attributes: Vec<Node>,
-}
-
-impl Node {
-    pub fn new() -> Node {
-        Node { parent: None, children: vec!(), attributes: vec!() }
-    }
-
-    pub fn new_with_parent(id: uint) -> Node {
-        Node { parent: Some(id), children: vec!(), attributes: vec!() }
-    }
-
-    fn parent(&self) -> &Node {
-        self
-    }
-
-    fn children(&self) -> std::slice::Items<Node> {
-        self.children.iter()
-    }
-
-    fn attributes(&self) -> std::slice::Items<Node> {
-        self.attributes.iter()
-    }
-}
-
 
 #[deriving(PartialEq,Show,Clone)]
 pub enum XPathValue<'n> {
     Boolean(bool),
     Number(f64),
     String(String),
-    Nodes(Nodeset<'n>), // rename as Nodeset
+    Nodes(Nodeset), // rename as Nodeset
 }
 
 impl<'n> XPathValue<'n> {
@@ -64,7 +38,7 @@ impl<'n> XPathValue<'n> {
         }
     }
 
-    fn nodeset(&self) -> Nodeset<'n> {
+    fn nodeset(&self) -> Nodeset {
         match *self {
             Nodes(ref ns) => ns.clone(),
             _ => fail!("Did not evaluate to a nodeset!"),
@@ -79,35 +53,39 @@ pub trait XPathFunction<'n> {
 }
 
 pub struct XPathEvaluationContext<'a> {
-    pub node: & 'a Node,
-    pub functions: & 'a HashMap<String, Box<XPathFunction<'a>>>,
+    document: & 'a Document,
+    node: Any,
+    functions: & 'a HashMap<String, Box<XPathFunction<'a>>>,
     position: uint,
 }
 
 impl<'a> XPathEvaluationContext<'a> {
-    pub fn new(node: & 'a Node,
-               functions: & 'a HashMap<String, Box<XPathFunction<'a>>>) -> XPathEvaluationContext<'a>
+    pub fn new<A: ToAny>(document: & 'a Document,
+                        node: A,
+                        functions: & 'a HashMap<String, Box<XPathFunction<'a>>>) -> XPathEvaluationContext<'a>
     {
         XPathEvaluationContext {
-            node: node,
+            document: document,
+            node: node.to_any(),
             functions: functions,
             position: 0,
         }
     }
 
-    fn node(&self) -> & 'a Node {
+    fn node(&self) -> Any {
         self.node
     }
 
     fn new_context_for(& self, size: uint) -> XPathEvaluationContext<'a> {
         XPathEvaluationContext {
+            document: self.document,
             node: self.node,
             functions: self.functions,
             position: 0,
         }
     }
 
-    fn next(& mut self, node: &Node) {
+    fn next<A: ToAny>(& mut self, node: A) {
         self.position += 1;
     }
 
@@ -125,33 +103,6 @@ pub struct XPathNodeTest;
 
 impl XPathNodeTest {
     fn test(&self, context: &XPathEvaluationContext, result: &mut Nodeset) {
-    }
-}
-
-#[deriving(Show,PartialEq,Clone)]
-pub struct Nodeset<'n> {
-    nodes: Vec<& 'n Node>,
-}
-
-impl<'n> Nodeset<'n> {
-    pub fn new() -> Nodeset<'n> {
-        Nodeset{nodes: Vec::new()}
-    }
-
-    pub fn add(& mut self, node: & 'n Node) {
-        self.nodes.push(node);
-    }
-
-    fn add_nodeset(& mut self, nodes: &Nodeset<'n>) {
-        self.nodes.push_all(nodes.nodes.as_slice());
-    }
-
-    pub fn size(&self) -> uint {
-        self.nodes.len()
-    }
-
-    fn iter(&self) -> std::slice::Items<& 'n Node> {
-        self.nodes.iter()
     }
 }
 
