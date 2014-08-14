@@ -14,8 +14,9 @@ pub struct Document {
     children: HashMap<Parent, Vec<Child>>,
     parents: HashMap<Child, Parent>,
 
-    // Associated attributes
-    assigned_attributes: HashMap<ElementNode, HashSet<AttributeNode>>,
+    // Attributes
+    attribute_children: HashMap<ElementNode, HashSet<AttributeNode>>,
+    attribute_parents: HashMap<AttributeNode, ElementNode>,
 }
 
 #[deriving(Show,Eq,PartialEq,Hash,Clone)]
@@ -96,7 +97,8 @@ impl Document {
             texts: Vec::new(),
             children: HashMap::new(),
             parents: HashMap::new(),
-            assigned_attributes: HashMap::new(),
+            attribute_children: HashMap::new(),
+            attribute_parents: HashMap::new(),
         }
     }
 
@@ -149,8 +151,15 @@ impl Document {
         self.texts.get_mut(text.i)
     }
 
+    pub fn attribute_parent(&self, attribute: AttributeNode) -> Option<ElementNode> {
+        match self.attribute_parents.find(&attribute) {
+            Some(e) => Some(e.clone()),
+            None => None
+        }
+    }
+
     fn attribute_for(&self, element: ElementNode, name: &str) -> Option<AttributeNode> {
-        match self.assigned_attributes.find(&element) {
+        match self.attribute_children.find(&element) {
             Some(ref attributes) => {
                 let mut node_attrs = attributes.iter().map(|node| (node, self.attribute(*node)));
                 match node_attrs.find(|&(_, attr)| attr.name.as_slice() == name) {
@@ -163,7 +172,7 @@ impl Document {
     }
 
     pub fn attributes(&self, element: ElementNode) -> Vec<AttributeNode> {
-        match self.assigned_attributes.find(&element) {
+        match self.attribute_children.find(&element) {
             Some(ref attrs) => attrs.iter().map(|a| a.clone()).collect(),
             None => vec![],
         }
@@ -176,18 +185,33 @@ impl Document {
         }
     }
 
-    pub fn set_attribute(&mut self, element: ElementNode, name: &str, value: &str) -> AttributeNode {
+    fn reset_attribute(&mut self, attribute: AttributeNode, value: &str) -> AttributeNode {
+        self.mut_attribute(attribute).value = value.to_string();
+        attribute
+    }
+
+    fn set_new_attribute(&mut self,
+                         element: ElementNode,
+                         name: &str,
+                         value: &str) -> AttributeNode
+    {
+        let aref = self.new_attribute(name, value);
+        let attribute_children = self.attribute_children.find_or_insert(element, HashSet::new());
+        attribute_children.insert(aref);
+
+        self.attribute_parents.insert(aref, element);
+
+        aref
+    }
+
+    pub fn set_attribute(&mut self,
+                         element: ElementNode,
+                         name: &str,
+                         value: &str) -> AttributeNode
+    {
         match self.attribute_for(element, name) {
-            Some(aref) => {
-                self.mut_attribute(aref).value = value.to_string();
-                aref
-            },
-            None => {
-                let aref = self.new_attribute(name, value);
-                let assigned_attributes = self.assigned_attributes.find_or_insert(element, HashSet::new());
-                assigned_attributes.insert(aref);
-                aref
-            },
+            Some(aref) => self.reset_attribute(aref, value),
+            None => self.set_new_attribute(element, name, value),
         }
     }
 
@@ -230,8 +254,8 @@ impl Document {
         }
     }
 
-    pub fn parent(&self, child: Child) -> Option<Parent> {
-        self.parents.find_copy(&child)
+    pub fn parent<C: ToChild>(&self, child: C) -> Option<Parent> {
+        self.parents.find_copy(&child.to_child())
     }
 }
 
@@ -459,6 +483,15 @@ fn elements_have_attributes() {
     d.set_attribute(alpha, "hello", "world");
     let val = d.get_attribute(alpha, "hello").unwrap();
     assert_eq!(val, "world");
+}
+
+#[test]
+fn attributes_know_their_element() {
+    let mut d = Document::new();
+    let element = d.new_element("element");
+    let attr = d.set_attribute(element, "hello", "world");
+
+    assert_eq!(element, d.attribute_parent(attr).unwrap());
 }
 
 #[test]
