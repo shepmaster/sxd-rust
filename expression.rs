@@ -280,3 +280,15 @@ impl<'n> XPathExpression<'n> for ExpressionRelational<'n> {
         Boolean(op(left_val.number(), right_val.number()))
     }
 }
+
+pub struct ExpressionRootNode;
+
+impl<'n> XPathExpression<'n> for ExpressionRootNode {
+    fn evaluate(&self, context: &XPathEvaluationContext<'n>) -> XPathValue<'n> {
+        let n = &context.node;
+
+        let mut result = Nodeset::new();
+        result.add(n.document().root());
+        Nodes(result)
+    }
+}

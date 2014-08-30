@@ -15,7 +15,8 @@ use xpath::expression::{ExpressionAnd,
                         ExpressionLiteral,
                         ExpressionMath,
                         ExpressionPredicate,
-                        ExpressionRelational};
+                        ExpressionRelational,
+                        ExpressionRootNode};
 use xpath::XPathFunction;
 use xpath::XPathEvaluationContext;
 
@@ -211,15 +212,10 @@ fn expression_step_numeric_predicate_selects_that_node() {
     let context = setup.context();
     let res = expr.evaluate(&context);
 
-    match res {
-        Nodes(ns) => {
-            let mut e = Nodeset::new();
-            e.add(input_node_1);
+    let mut expected = Nodeset::new();
+    expected.add(input_node_1);
 
-            assert_eq!(ns, e);
-        },
-        _ => fail!("Not a nodeset"),
-    }
+    assert_eq!(res, Nodes(expected));
 }
 
 #[test]
@@ -240,14 +236,8 @@ fn expression_step_false_predicate_selects_no_nodes() {
     let context = setup.context();
     let res = expr.evaluate(&context);
 
-    match res {
-        Nodes(ns) => {
-            let e = Nodeset::new();
-
-            assert_eq!(ns, e);
-        },
-        _ => fail!("Not a nodeset"),
-    }
+    let expected = Nodeset::new();
+    assert_eq!(res, Nodes(expected));
 }
 
 #[test]
@@ -262,4 +252,19 @@ fn expression_relational_does_basic_comparisons() {
     let context = setup.context();
     let res = expr.evaluate(&context);
     assert_eq!(res, Boolean(false));
+}
+
+#[test]
+fn expression_root_node_finds_the_root() {
+    let setup = Setup::new();
+
+    let expr = box ExpressionRootNode;
+
+    let context = setup.context();
+    let res = expr.evaluate(&context);
+
+    let mut expected = Nodeset::new();
+    expected.add(setup.doc.root());
+
+    assert_eq!(res, Nodes(expected));
 }
