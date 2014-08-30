@@ -1,12 +1,15 @@
 extern crate document;
 extern crate xpath;
 
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::collections::HashMap;
 
 use document::{Document,Element,Nodeset};
 
 use xpath::XPathValue;
 use xpath::{Boolean, Number, String, Nodes};
+use xpath::XPathNodeTest;
 use xpath::expression::XPathExpression;
 use xpath::expression::{ExpressionAnd,
                         ExpressionEqual,
@@ -16,9 +19,11 @@ use xpath::expression::{ExpressionAnd,
                         ExpressionMath,
                         ExpressionPredicate,
                         ExpressionRelational,
-                        ExpressionRootNode};
+                        ExpressionRootNode,
+                        ExpressionStep};
 use xpath::XPathFunction;
 use xpath::XPathEvaluationContext;
+use xpath::axis::XPathAxis;
 
 struct FailExpression;
 
@@ -258,7 +263,7 @@ fn expression_relational_does_basic_comparisons() {
 fn expression_root_node_finds_the_root() {
     let setup = Setup::new();
 
-    let expr = box ExpressionRootNode;
+    let expr = ExpressionRootNode;
 
     let context = setup.context();
     let res = expr.evaluate(&context);
@@ -267,4 +272,51 @@ fn expression_root_node_finds_the_root() {
     expected.add(setup.doc.root());
 
     assert_eq!(res, Nodes(expected));
+}
+
+#[deriving(Clone)]
+struct MockAxis {
+    calls: Rc<RefCell<uint>>,
+}
+
+impl MockAxis {
+    fn new() -> MockAxis {
+        MockAxis{ calls: Rc::new(RefCell::new(0)) }
+    }
+
+    fn calls(&self) -> uint {
+        *self.calls.borrow()
+    }
+}
+
+impl XPathAxis for MockAxis {
+    fn select_nodes(&self,
+                    context:   &XPathEvaluationContext,
+                    node_test: &XPathNodeTest,
+                    result:    &mut Nodeset)
+    {
+        *self.calls.borrow_mut() += 1;
+    }
+}
+
+struct DummyNodeTest;
+
+impl XPathNodeTest for DummyNodeTest {
+    fn test(&self, context: &XPathEvaluationContext, result: &mut Nodeset) {
+    }
+}
+
+#[test]
+fn expression_step_delegates_to_the_axis() {
+    let setup = Setup::new();
+
+    let axis = MockAxis::new();
+    let node_test = DummyNodeTest;
+
+    let expr = ExpressionStep::new(box axis.clone(), box node_test);
+
+    let context = setup.context();
+    expr.evaluate(&context);
+
+    assert_eq!(1, axis.calls());
 }

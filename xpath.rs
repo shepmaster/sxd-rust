@@ -95,11 +95,8 @@ impl<'a> XPathEvaluationContext<'a> {
 }
 
 
-pub struct XPathNodeTest;
-
-impl XPathNodeTest {
-    fn test(&self, context: &XPathEvaluationContext, result: &mut Nodeset) {
-    }
+pub trait XPathNodeTest {
+    fn test(&self, context: &XPathEvaluationContext, result: &mut Nodeset);
 }
 
 struct EmptyIterator<T>;

@@ -3,8 +3,11 @@ extern crate document;
 use document::Nodeset;
 
 use super::XPathEvaluationContext;
+use super::XPathNodeTest;
 use super::XPathValue;
 use super::{Boolean,Number,String,Nodes};
+
+use super::axis::XPathAxis;
 
 pub trait XPathExpression<'n> {
     fn evaluate(& self, context: &XPathEvaluationContext<'n>) -> XPathValue<'n>;
@@ -289,6 +292,25 @@ impl<'n> XPathExpression<'n> for ExpressionRootNode {
 
         let mut result = Nodeset::new();
         result.add(n.document().root());
+        Nodes(result)
+    }
+}
+
+pub struct ExpressionStep {
+    axis: Box<XPathAxis>,
+    node_test: Box<XPathNodeTest>,
+}
+
+impl ExpressionStep {
+    pub fn new(axis: Box<XPathAxis>, node_test: Box<XPathNodeTest>) -> ExpressionStep {
+        ExpressionStep {axis: axis, node_test: node_test}
+    }
+}
+
+impl<'n> XPathExpression<'n> for ExpressionStep {
+    fn evaluate(&self, context: &XPathEvaluationContext<'n>) -> XPathValue<'n> {
+        let mut result = Nodeset::new();
+        self.axis.select_nodes(context, self.node_test, & mut result);
         Nodes(result)
     }
 }

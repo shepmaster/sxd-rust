@@ -12,7 +12,7 @@ enum PrincipalNodeType {
 }
 
 /// A directed traversal of Nodes.
-trait XPathAxis {
+pub trait XPathAxis {
     /// Applies the given node test to the nodes selected by this axis,
     /// adding matching nodes to the nodeset.
     fn select_nodes(&self,
