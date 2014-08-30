@@ -3,7 +3,7 @@
 extern crate document;
 
 use document::{Any,ToAny};
-use document::{Document,Nodeset};
+use document::{Nodeset};
 use std::collections::HashMap;
 
 #[deriving(PartialEq,Show,Clone)]
@@ -53,33 +53,29 @@ pub trait XPathFunction<'n> {
 }
 
 pub struct XPathEvaluationContext<'a> {
-    document: & 'a Document,
     node: Any,
     functions: & 'a HashMap<String, Box<XPathFunction<'a>>>,
     position: uint,
 }
 
 impl<'a> XPathEvaluationContext<'a> {
-    pub fn new<A: ToAny>(document: & 'a Document,
-                        node: A,
-                        functions: & 'a HashMap<String, Box<XPathFunction<'a>>>) -> XPathEvaluationContext<'a>
+    pub fn new<A: ToAny>(node: A,
+                         functions: & 'a HashMap<String, Box<XPathFunction<'a>>>) -> XPathEvaluationContext<'a>
     {
         XPathEvaluationContext {
-            document: document,
             node: node.to_any(),
             functions: functions,
             position: 0,
         }
     }
 
-    fn node(&self) -> Any {
-        self.node
+    fn node(&self) -> &Any {
+        &self.node
     }
 
     fn new_context_for(& self, size: uint) -> XPathEvaluationContext<'a> {
         XPathEvaluationContext {
-            document: self.document,
-            node: self.node,
+            node: self.node.clone(),
             functions: self.functions,
             position: 0,
         }

@@ -1,5 +1,11 @@
 all: xpath-tokenizer-test xpath-token-deabbreviator-test xpath-token-disambiguator-test xpath-expression-test libdocument.rlib
 
+clean:
+	rm -f libdocument.rlib libxpath.rlib document
+
+docs:
+	rustdoc document.rs
+
 libdocument.rlib: document.rs
 	rustc -g --crate-type=lib document.rs
 

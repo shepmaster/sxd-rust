@@ -3,7 +3,7 @@ extern crate xpath;
 
 use std::collections::HashMap;
 
-use document::{Document,ElementNode,Nodeset};
+use document::{Document,Element,Nodeset};
 
 use xpath::XPathValue;
 use xpath::{Boolean, Number, String, Nodes};
@@ -29,14 +29,14 @@ impl<'n> XPathExpression<'n> for FailExpression {
 
 struct Setup<'a> {
     doc: Document,
-    node: ElementNode,
+    node: Element,
     funs: HashMap<String, Box<XPathFunction<'a>>>,
 }
 
 impl<'a> Setup<'a> {
     fn new() -> Setup<'a> {
-        let mut d = Document::new();
-        let n = d.new_element("test");
+        let d = Document::new();
+        let n = d.new_element("test".to_string());
         Setup {
             doc: d,
             node: n,
@@ -45,7 +45,7 @@ impl<'a> Setup<'a> {
     }
 
     fn context(& 'a self) -> XPathEvaluationContext<'a> {
-        XPathEvaluationContext::new(&self.doc, self.node, &self.funs)
+        XPathEvaluationContext::new(self.node.clone(), &self.funs)
     }
 }
 
@@ -195,12 +195,12 @@ fn expression_math_does_basic_math() {
 
 #[test]
 fn expression_step_numeric_predicate_selects_that_node() {
-    let mut setup = Setup::new();
+    let setup = Setup::new();
 
-    let input_node_1 = setup.doc.new_element("one");
-    let input_node_2 = setup.doc.new_element("two");
+    let input_node_1 = setup.doc.new_element("one".to_string());
+    let input_node_2 = setup.doc.new_element("two".to_string());
     let mut input_nodeset = Nodeset::new();
-    input_nodeset.add(input_node_1);
+    input_nodeset.add(input_node_1.clone());
     input_nodeset.add(input_node_2);
 
     let selected_nodes = box ExpressionLiteral{value: Nodes(input_nodeset)};
@@ -224,10 +224,10 @@ fn expression_step_numeric_predicate_selects_that_node() {
 
 #[test]
 fn expression_step_false_predicate_selects_no_nodes() {
-    let mut setup = Setup::new();
+    let setup = Setup::new();
 
-    let input_node_1 = setup.doc.new_element("one");
-    let input_node_2 = setup.doc.new_element("two");
+    let input_node_1 = setup.doc.new_element("one".to_string());
+    let input_node_2 = setup.doc.new_element("two".to_string());
     let mut input_nodeset = Nodeset::new();
     input_nodeset.add(input_node_1);
     input_nodeset.add(input_node_2);

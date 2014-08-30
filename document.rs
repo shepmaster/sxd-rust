@@ -1,334 +1,642 @@
 #![crate_name = "document"]
 
+use std::fmt;
+use std::rc::{Rc,Weak};
+use std::cell::RefCell;
 use std::collections::hashmap::HashMap;
-use std::collections::hashmap::HashSet;
 
-#[deriving(Show)]
+// FIXME: Parents need to be weakref!
+// TODO: See about removing duplication of child / parent implementations.
+// TODO: remove clone from inner?
+
+// children
+// root nodes -> 1x element, comment, pi
+// element nodes -> element, comment, text, pi (attribute, namespace)
+// text nodes ->
+// attribute nodes ->
+// namespace nodes ->
+// processing instruction nodes ->
+// comment nodes ->
+//
+// parents
+// root nodes ->
+// element nodes -> element, root
+// text nodes -> element
+// attribute nodes -> element
+// namespace nodes -> element
+// processing instruction nodes -> element
+// comment nodes -> element
+
+struct DocumentInner {
+    // We will always have a root, but during construction we have to
+    // pick one first
+    root: Option<Root>,
+}
+
+#[deriving(Clone)]
 pub struct Document {
-    /// Storage for each maintained type
-    elements: Vec<Element>,
-    attributes: Vec<Attribute>,
-    texts: Vec<Text>,
-
-    // Primary associations between nodes
-    children: HashMap<Parent, Vec<Child>>,
-    parents: HashMap<Child, Parent>,
-
-    // Attributes
-    attribute_children: HashMap<ElementNode, HashSet<AttributeNode>>,
-    attribute_parents: HashMap<AttributeNode, ElementNode>,
-}
-
-#[deriving(Show,Eq,PartialEq,Hash,Clone)]
-pub struct ElementNode   { i: uint }
-#[deriving(Show,Eq,PartialEq,Hash,Clone)]
-pub struct AttributeNode { i: uint }
-#[deriving(Show,Eq,PartialEq,Hash,Clone)]
-pub struct TextNode      { i: uint }
-
-#[deriving(Show,Eq,PartialEq,Hash,Clone)]
-pub enum Parent {
-    ElementParent(ElementNode),
-}
-
-impl Parent {
-    pub fn element(&self) -> Option<ElementNode> {
-        match self {
-            &ElementParent(e) => Some(e),
-        }
-    }
-}
-
-pub trait ToParent {
-    fn to_parent(&self) -> Parent;
-}
-
-impl ToParent for Parent {
-    fn to_parent(&self) -> Parent { *self }
-}
-
-impl ToParent for ElementNode {
-    fn to_parent(&self) -> Parent { ElementParent(*self) }
-}
-
-#[deriving(Show,Eq,PartialEq,Hash,Clone)]
-pub enum Child {
-    ElementChild(ElementNode),
-    TextChild(TextNode),
-}
-
-impl Child {
-    pub fn element(&self) -> Option<ElementNode> {
-        match self {
-            &ElementChild(e) => Some(e),
-            _ => None,
-        }
-    }
-
-    pub fn text(&self) -> Option<TextNode> {
-        match self {
-            &TextChild(t) => Some(t),
-            _ => None,
-        }
-    }
-}
-
-pub trait ToChild {
-    fn to_child(&self) -> Child;
-}
-
-impl ToChild for Child {
-    fn to_child(&self) -> Child { *self }
-}
-
-impl ToChild for ElementNode {
-    fn to_child(&self) -> Child { ElementChild(*self) }
-}
-
-impl ToChild for TextNode {
-    fn to_child(&self) -> Child { TextChild(*self) }
+    inner: Rc<RefCell<DocumentInner>>,
 }
 
 impl Document {
     pub fn new() -> Document {
-        Document {
-            elements: Vec::new(),
-            attributes: Vec::new(),
-            texts: Vec::new(),
-            children: HashMap::new(),
-            parents: HashMap::new(),
-            attribute_children: HashMap::new(),
-            attribute_parents: HashMap::new(),
-        }
+        let inner = DocumentInner { root: None };
+        let doc = Document { inner: Rc::new(RefCell::new(inner)) };
+        let root = Root::new(doc.clone());
+        doc.inner.borrow_mut().root = Some(root);
+        doc
     }
 
-    pub fn new_element(&mut self, name: &str) -> ElementNode {
-        let eref = ElementNode{i: self.elements.len()};
-        self.elements.push(Element {
-            name: name.to_string(),
-        });
-        eref
+    pub fn new_element(&self, name: String) -> Element {
+        Element::new(self.clone(), name)
     }
 
-    fn new_attribute(&mut self, name: &str, value: &str) -> AttributeNode {
-        let aref = AttributeNode{i: self.attributes.len()} ;
-        self.attributes.push(Attribute {
-            name: name.to_string(),
-            value: value.to_string(),
-        });
-        aref
+    pub fn new_text(&self, text: String) -> Text {
+        Text::new(self.clone(), text)
     }
 
-    pub fn new_text(&mut self, value: &str) -> TextNode {
-        let tref = TextNode{i: self.texts.len()};
-        self.texts.push(Text {
-            value: value.to_string(),
-        });
-        tref
-    }
-
-    pub fn element<'a>(&'a self, element: ElementNode) -> &'a Element {
-        &self.elements[element.i]
-    }
-
-    pub fn mut_element<'a>(&'a mut self, element: ElementNode) -> &'a mut Element {
-        self.elements.get_mut(element.i)
-    }
-
-    fn attribute<'a>(&'a self, attribute: AttributeNode) -> &'a Attribute {
-        &self.attributes[attribute.i]
-    }
-
-    fn mut_attribute<'a>(&'a mut self, attribute: AttributeNode) -> &'a mut Attribute {
-        self.attributes.get_mut(attribute.i)
-    }
-
-    pub fn text<'a>(&'a self, text: TextNode) -> &'a Text {
-        &self.texts[text.i]
-    }
-
-    pub fn mut_text<'a>(&'a mut self, text: TextNode) -> &'a mut Text {
-        self.texts.get_mut(text.i)
-    }
-
-    pub fn attribute_parent(&self, attribute: AttributeNode) -> Option<ElementNode> {
-        match self.attribute_parents.find(&attribute) {
-            Some(e) => Some(e.clone()),
-            None => None
-        }
-    }
-
-    fn attribute_for(&self, element: ElementNode, name: &str) -> Option<AttributeNode> {
-        match self.attribute_children.find(&element) {
-            Some(ref attributes) => {
-                let mut node_attrs = attributes.iter().map(|node| (node, self.attribute(*node)));
-                match node_attrs.find(|&(_, attr)| attr.name.as_slice() == name) {
-                    Some((node, _)) => Some(*node),
-                    None => None,
-                }
-            },
-            None => None,
-        }
-    }
-
-    pub fn attributes(&self, element: ElementNode) -> Vec<AttributeNode> {
-        match self.attribute_children.find(&element) {
-            Some(ref attrs) => attrs.iter().map(|a| a.clone()).collect(),
-            None => vec![],
-        }
-    }
-
-    pub fn get_attribute(&self, element: ElementNode, name: &str) -> Option<&str> {
-        match self.attribute_for(element, name) {
-            Some(aref) => Some(self.attribute(aref).value.as_slice()),
-            None => None,
-        }
-    }
-
-    fn reset_attribute(&mut self, attribute: AttributeNode, value: &str) -> AttributeNode {
-        self.mut_attribute(attribute).value = value.to_string();
-        attribute
-    }
-
-    fn set_new_attribute(&mut self,
-                         element: ElementNode,
-                         name: &str,
-                         value: &str) -> AttributeNode
-    {
-        let aref = self.new_attribute(name, value);
-        let attribute_children = self.attribute_children.find_or_insert(element, HashSet::new());
-        attribute_children.insert(aref);
-
-        self.attribute_parents.insert(aref, element);
-
-        aref
-    }
-
-    pub fn set_attribute(&mut self,
-                         element: ElementNode,
-                         name: &str,
-                         value: &str) -> AttributeNode
-    {
-        match self.attribute_for(element, name) {
-            Some(aref) => self.reset_attribute(aref, value),
-            None => self.set_new_attribute(element, name, value),
-        }
-    }
-
-    fn remove_parentage(&mut self, child: Child) {
-        match self.parent(child) {
-            Some(ref parent) => {
-                match self.children.find_mut(parent) {
-                    Some(children) => {
-                        match children.as_slice().position_elem(&child) {
-                            Some(idx) => { children.remove(idx); },
-                            None => {},
-                        }
-                    },
-                    None => {},
-                }
-            },
-            None => {}
-        }
-    }
-
-    pub fn append_child<P: ToParent, C: ToChild>(&mut self, parent: P, child: C) {
-        let parent = parent.to_parent();
-        let child = child.to_child();
-
-        {
-            let kids = self.children.find_or_insert(parent, Vec::new());
-            kids.push(child);
-        }
-
-        self.remove_parentage(child);
-        self.parents.insert(child, parent);
-    }
-
-    pub fn children<P: ToParent>(&self, parent: P) -> Vec<Child> {
-        let parent = parent.to_parent();
-
-        match self.children.find(&parent) {
-            Some(v) => v.iter().map(|r| r.clone()).collect(),
-            None => vec![],
-        }
-    }
-
-    pub fn parent<C: ToChild>(&self, child: C) -> Option<Parent> {
-        self.parents.find_copy(&child.to_child())
+    pub fn root(&self) -> Root {
+        let inner = self.inner.borrow();
+        inner.root.clone().unwrap()
     }
 }
 
-#[deriving(Show)]
-pub struct Element {
-    name: String,
-}
-
-impl Element {
-    pub fn name(&self) -> &str {
-        self.name.as_slice()
-    }
-
-    pub fn set_name(&mut self, name: &str) {
-        self.name = name.to_string();
+impl PartialEq for Document {
+    fn eq(&self, other: &Document) -> bool {
+        &*self.inner as *const RefCell<DocumentInner> == &*other.inner as *const RefCell<DocumentInner>
     }
 }
 
-#[deriving(Show)]
-pub struct Attribute {
-    name: String,
-    value: String,
+impl fmt::Show for Document {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Document")
+    }
 }
 
-impl Attribute {
-    pub fn name(&self)  -> &str { self.name.as_slice() }
-    pub fn value(&self) -> &str { self.value.as_slice() }
+/// Items that may be children of the root node
+#[deriving(Clone,PartialEq)]
+pub enum RootChild {
+    ElementRootChild(Element),
 }
 
-#[deriving(Show)]
+impl RootChild {
+    fn is_element(&self) -> bool {
+        match self {
+            &ElementRootChild(_) => true,
+        }
+    }
+
+    pub fn element(&self) -> Option<Element> {
+        match self {
+            &ElementRootChild(ref e) => Some(e.clone()),
+        }
+    }
+
+    pub fn remove_from_parent(&self) {
+        match self {
+            &ElementRootChild(ref e) => e.remove_from_parent(),
+        }
+    }
+
+    pub fn set_parent(&self, parent: Root) {
+        match self {
+            &ElementRootChild(ref e) => e.set_parent(parent),
+        }
+    }
+}
+
+pub trait ToRootChild {
+    fn to_root_child(&self) -> RootChild;
+}
+
+impl ToRootChild for RootChild {
+    fn to_root_child(&self) -> RootChild { self.clone() }
+}
+
+impl ToRootChild for Element {
+    fn to_root_child(&self) -> RootChild { ElementRootChild(self.clone()) }
+}
+
+#[deriving(Clone)]
+struct RootInner {
+    document: Document,
+    children: Vec<RootChild>,
+}
+
+#[deriving(Clone)]
+pub struct Root {
+    inner: Rc<RefCell<RootInner>>,
+}
+
+impl Root {
+    fn new(document: Document) -> Root {
+        let inner = RootInner { document: document, children: Vec::new() };
+        Root { inner: Rc::new(RefCell::new(inner)) }
+    }
+
+    pub fn document(&self) -> Document {
+        self.inner.borrow().document.clone()
+    }
+
+    fn remove_element_children(&self) {
+        let mut inner = self.inner.borrow_mut();
+
+        inner.children.retain(|c| ! c.is_element());
+    }
+
+    pub fn remove_child<C : ToRootChild>(&self, child: C) {
+        let child = child.to_root_child();
+        let mut inner = self.inner.borrow_mut();
+        inner.children.retain(|c| c != &child);
+    }
+
+    /// This removes any existing element children before appending a new element
+    pub fn append_child<C : ToRootChild>(&self, child: C) {
+        let child = child.to_root_child();
+
+        if child.is_element() {
+            self.remove_element_children();
+        }
+
+        child.remove_from_parent();
+        child.set_parent(self.clone());
+
+        let mut inner = self.inner.borrow_mut();
+        inner.children.push(child);
+    }
+
+    pub fn children(&self) -> Vec<RootChild> {
+        let inner = self.inner.borrow();
+        inner.children.clone()
+    }
+
+    fn each_child(&self, f: |&RootChild|) {
+        let inner = self.inner.borrow();
+        for child in inner.children.iter() {
+            f(child);
+        }
+    }
+}
+
+impl PartialEq for Root {
+    fn eq(&self, other: &Root) -> bool {
+        &*self.inner as *const RefCell<RootInner> == &*other.inner as *const RefCell<RootInner>
+    }
+}
+
+impl fmt::Show for Root {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Root element")
+    }
+}
+
+#[deriving(Clone)]
+struct TextInner {
+    document: Document,
+    text: String,
+    parent: Option<Element>,
+}
+
+#[deriving(Clone)]
 pub struct Text {
-    value: String,
+    inner: Rc<RefCell<TextInner>>,
 }
 
 impl Text {
-    pub fn value(&self) -> &str {
-        self.value.as_slice()
+    fn new(document: Document, text: String) -> Text {
+        let inner = TextInner {document: document, text: text, parent: None};
+        Text {inner: Rc::new(RefCell::new(inner))}
     }
 
-    pub fn set_value(& mut self, value: &str) {
-        self.value = value.to_string()
+    pub fn document(&self) -> Document {
+        self.inner.borrow().document.clone()
+    }
+
+    pub fn text(&self) -> String {
+        let inner = self.inner.borrow();
+        inner.text.clone()
+    }
+
+    pub fn set_text(&self, text: String) {
+        let mut inner = self.inner.borrow_mut();
+        inner.text = text;
+    }
+
+    pub fn remove_from_parent(&self) {
+        let mut inner = self.inner.borrow_mut();
+        match inner.parent {
+            Some(ref e) => e.remove_child(self.clone()),
+            None => {}
+        };
+        inner.parent = None;
+    }
+
+    fn set_parent(&self, parent: Element) {
+        let mut inner = self.inner.borrow_mut();
+        inner.parent = Some(parent);
+    }
+
+    pub fn parent(&self) -> Option<Element> {
+        let inner = self.inner.borrow();
+        inner.parent.clone()
     }
 }
 
-pub struct Comment;
-pub struct Root;
+impl PartialEq for Text {
+    fn eq(&self, other: &Text) -> bool {
+        &*self.inner as *const RefCell<TextInner> == &*other.inner as *const RefCell<TextInner>
+    }
+}
 
-#[deriving(Show,Eq,PartialEq,Hash,Clone)]
+impl fmt::Show for Text {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Text: {}", self.inner.borrow().text)
+    }
+}
+
+#[deriving(Clone)]
+struct AttributeInner {
+    document: Document,
+    name: String,
+    value: String,
+    element: Option<Weak<RefCell<ElementInner>>>,
+}
+
+#[deriving(Clone)]
+pub struct Attribute {
+    inner: Rc<RefCell<AttributeInner>>,
+}
+
+impl Attribute {
+    fn new(document: Document, name: String, value: String) -> Attribute {
+        let inner = AttributeInner {document: document,
+                                    name: name,
+                                    value: value,
+                                    element: None};
+        Attribute {inner: Rc::new(RefCell::new(inner))}
+    }
+
+    pub fn document(&self) -> Document {
+        self.inner.borrow().document.clone()
+    }
+
+    pub fn name(&self) -> String {
+        self.inner.borrow().name.clone()
+    }
+
+    pub fn value(&self) -> String {
+        self.inner.borrow().value.clone()
+    }
+
+    pub fn parent(&self) -> Option<Element> {
+        let a = self.inner.borrow();
+        let b = &a.element;
+        let c = b.as_ref().and_then(|x| x.upgrade());
+        let d = c.map(|x| Element {inner: x});
+        d
+    }
+}
+
+impl PartialEq for Attribute {
+    fn eq(&self, other: &Attribute) -> bool {
+        &*self.inner as *const RefCell<AttributeInner> == &*other.inner as *const RefCell<AttributeInner>
+    }
+}
+
+impl fmt::Show for Attribute {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let inner = self.inner.borrow();
+        write!(f, "@{}='{}'", inner.name, inner.value)
+    }
+}
+
+/// Items that may be children of element nodes
+#[deriving(Clone,PartialEq,Show)]
+pub enum ElementChild {
+    ElementElementChild(Element),
+    TextElementChild(Text),
+}
+
+impl ElementChild {
+    pub fn element(&self) -> Option<Element> {
+        match self {
+            &ElementElementChild(ref e) => Some(e.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn text(&self) -> Option<Text> {
+        match self {
+            &TextElementChild(ref t) => Some(t.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn remove_from_parent(&self) {
+        match self {
+            &ElementElementChild(ref e) => e.remove_from_parent(),
+            &TextElementChild(ref t) => t.remove_from_parent(),
+        }
+    }
+
+    fn set_parent(&self, parent: Element) {
+        match self {
+            &ElementElementChild(ref e) => e.set_parent(parent),
+            &TextElementChild(ref t) => t.set_parent(parent),
+        }
+    }
+
+    pub fn parent(&self) -> Option<Element> {
+        match self {
+            &ElementElementChild(ref e) =>
+                match e.parent() {
+                    None => None,
+                    Some(ElementElementParent(ref e)) => Some(e.clone()),
+                    _ => fail!("An element's child's parent is not an element")
+                },
+            &TextElementChild(ref t) => t.parent(),
+        }
+    }
+}
+
+pub trait ToElementChild {
+    fn to_element_child(&self) -> ElementChild;
+}
+
+impl ToElementChild for ElementChild {
+    fn to_element_child(&self) -> ElementChild { self.clone() }
+}
+
+impl ToElementChild for Element {
+    fn to_element_child(&self) -> ElementChild { ElementElementChild(self.clone()) }
+}
+
+impl ToElementChild for Text {
+    fn to_element_child(&self) -> ElementChild { TextElementChild(self.clone()) }
+}
+
+impl ToElementChild for RootChild {
+    fn to_element_child(&self) -> ElementChild {
+        match self {
+            &ElementRootChild(ref e) => ElementElementChild(e.clone()),
+        }
+    }
+}
+
+/// Items that may be parents of element nodes
+#[deriving(PartialEq,Clone)]
+pub enum ElementParent {
+    ElementElementParent(Element),
+    RootElementParent(Root),
+}
+
+impl ElementParent {
+    pub fn element(&self) -> Option<Element> {
+        match self {
+            &ElementElementParent(ref e) => Some(e.clone()),
+            _ => None
+        }
+    }
+
+    pub fn root(&self) -> Option<Root> {
+        match self {
+            &RootElementParent(ref r) => Some(r.clone()),
+            _ => None
+        }
+    }
+
+    pub fn remove_child(&self, child: Element) {
+        match self {
+            &ElementElementParent(ref e) => e.remove_child(child),
+            &RootElementParent(ref r) => r.remove_child(child),
+        }
+    }
+
+    pub fn children(&self) -> Vec<ElementChild> {
+        match self {
+            &ElementElementParent(ref e) => e.children(),
+            &RootElementParent(ref e) => e.children().iter().map(|x| x.to_element_child()).collect(),
+        }
+    }
+}
+
+pub trait ToElementParent {
+    fn to_element_parent(&self) -> ElementParent;
+}
+
+impl ToElementParent for Element {
+    fn to_element_parent(&self) -> ElementParent {
+        ElementElementParent(self.clone())
+    }
+}
+
+impl ToElementParent for Root {
+    fn to_element_parent(&self) -> ElementParent {
+        RootElementParent(self.clone())
+    }
+}
+
+#[deriving(Clone)]
+struct ElementInner {
+    document: Document,
+    name: String,
+    parent: Option<ElementParent>,
+    children: Vec<ElementChild>,
+    attributes: HashMap<String, Attribute>,
+}
+
+#[deriving(Clone)]
+pub struct Element {
+    inner: Rc<RefCell<ElementInner>>,
+}
+
+// TODO: See about using the attribute value reference as the key to the hash
+impl Element {
+    fn new(document: Document, name: String) -> Element {
+        let inner = ElementInner {document: document,
+                                  name: name,
+                                  parent: None,
+                                  children: Vec::new(),
+                                  attributes: HashMap::new()};
+        Element {inner: Rc::new(RefCell::new(inner))}
+    }
+
+    pub fn document(&self) -> Document {
+        let inner = self.inner.borrow();
+        inner.document.clone()
+    }
+
+    pub fn name(&self) -> String {
+        let inner = self.inner.borrow();
+        inner.name.clone()
+
+    }
+
+    pub fn set_name(&self, name: String) {
+        let mut inner = self.inner.borrow_mut();
+        inner.name = name;
+    }
+
+    pub fn parent(&self) -> Option<ElementParent> {
+        let inner = self.inner.borrow();
+        inner.parent.clone()
+    }
+
+    // Does not change child at all
+    fn remove_child<C : ToElementChild>(&self, child: C) {
+        let child = child.to_element_child();
+        let mut inner = self.inner.borrow_mut();
+        inner.children.retain(|c| c != &child);
+    }
+
+    fn remove_from_parent(&self) {
+        let mut inner = self.inner.borrow_mut();
+        match inner.parent {
+            Some(ref e) => e.remove_child(self.clone()),
+            None => {}
+        };
+        inner.parent = None;
+    }
+
+    fn set_parent<P : ToElementParent>(&self, parent: P) {
+        let parent = parent.to_element_parent();
+        let mut inner = self.inner.borrow_mut();
+        inner.parent = Some(parent);
+    }
+
+    pub fn append_child<C : ToElementChild>(&self, child: C) {
+        let child = child.to_element_child();
+
+        child.remove_from_parent();
+        child.set_parent(self.clone());
+
+        let mut inner = self.inner.borrow_mut();
+        inner.children.push(child.clone());
+    }
+
+    pub fn children(&self) -> Vec<ElementChild> {
+        let inner = self.inner.borrow();
+        inner.children.clone()
+    }
+
+    pub fn each_child(&self, f: |&ElementChild|) {
+        let inner = self.inner.borrow();
+        for child in inner.children.iter() {
+            f(child);
+        }
+    }
+
+    pub fn set_attribute(&self, name: String, value: String) -> Attribute {
+        let attr = {
+            let inner = self.inner.borrow();
+            Attribute::new(inner.document.clone(), name.clone(), value)
+        };
+
+        attr.inner.borrow_mut().element = Some(self.inner.downgrade());
+        self.inner.borrow_mut().attributes.insert(name, attr.clone());
+        attr
+    }
+
+    pub fn attributes(&self) -> Vec<Attribute> {
+        let inner = self.inner.borrow();
+        inner.attributes.values().map(|a| a.clone()).collect()
+    }
+
+    pub fn each_attribute(&self, f: |&Attribute|) {
+        let inner = self.inner.borrow();
+        for attr in inner.attributes.values() {
+            f(attr);
+        }
+    }
+
+    pub fn attribute(&self, name: &str) -> Option<Attribute> {
+        let inner = self.inner.borrow();
+        inner.attributes.find(&name.to_string()).map(|x| x.clone())
+    }
+
+    // TODO: look into equiv
+    pub fn get_attribute(&self, name: &str) -> Option<String> {
+        let inner = self.inner.borrow();
+        let attr = inner.attributes.find(&name.to_string());
+        attr.map(|x| x.inner.borrow().value.clone())
+    }
+}
+
+impl PartialEq for Element {
+    fn eq(&self, other: &Element) -> bool {
+        // Nodes have reference equality, so we just check to see if
+        // we are pointing at the same thing.
+        &*self.inner as *const RefCell<ElementInner> == &*other.inner as *const RefCell<ElementInner>
+    }
+}
+
+impl fmt::Show for Element {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "<{}>", self.inner.borrow().name)
+    }
+}
+
+#[deriving(Clone,Show,PartialEq)]
 pub enum Any {
-    ElementAny(ElementNode),
-    AttributeAny(AttributeNode),
-    TextAny(TextNode),
+    ElementAny(Element),
+    AttributeAny(Attribute),
+    TextAny(Text),
+    RootAny(Root),
 }
 
 impl Any {
-    pub fn element(&self) -> Option<ElementNode> {
+    pub fn element(&self) -> Option<Element> {
         match self {
-            &ElementAny(e) => Some(e),
+            &ElementAny(ref e) => Some(e.clone()),
             _ => None,
         }
     }
 
-    pub fn attribute(&self) -> Option<AttributeNode> {
+    pub fn attribute(&self) -> Option<Attribute> {
         match self {
-            &AttributeAny(e) => Some(e),
+            &AttributeAny(ref e) => Some(e.clone()),
             _ => None,
         }
     }
 
-    pub fn text(&self) -> Option<TextNode> {
+    pub fn text(&self) -> Option<Text> {
         match self {
-            &TextAny(e) => Some(e),
+            &TextAny(ref e) => Some(e.clone()),
             _ => None,
+        }
+    }
+
+    pub fn root(&self) -> Option<Root> {
+        match self {
+            &RootAny(ref e) => Some(e.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn document(&self) -> Document {
+        match self {
+            &AttributeAny(ref a) => a.document(),
+            &ElementAny(ref e)   => e.document(),
+            &RootAny(ref r)      => r.document(),
+            &TextAny(ref t)      => t.document(),
+        }
+    }
+
+    pub fn parent(&self) -> Option<Any> {
+        match self {
+            &AttributeAny(ref a) => a.parent().map(|x| x.to_any()),
+            &ElementAny(ref e)   => e.parent().map(|x| x.to_any()),
+            &TextAny(ref t)      => t.parent().map(|x| x.to_any()),
+            &RootAny(_) => None,
+        }
+    }
+
+    pub fn children(&self) -> Vec<Any> {
+        match self {
+            &ElementAny(ref e) => e.children().iter().map(|x| x.to_any()).collect(),
+            &RootAny(ref r)    => r.children().iter().map(|x| x.to_any()).collect(),
+            &TextAny(_)        |
+            &AttributeAny(_)   => Vec::new(),
         }
     }
 }
@@ -338,253 +646,343 @@ pub trait ToAny {
 }
 
 impl ToAny for Any {
-    fn to_any(&self) -> Any { *self }
+    fn to_any(&self) -> Any { self.clone() }
 }
 
-impl ToAny for ElementNode {
-    fn to_any(&self) -> Any { ElementAny(*self) }
+impl ToAny for Element {
+    fn to_any(&self) -> Any { ElementAny(self.clone()) }
 }
 
-impl ToAny for AttributeNode {
-    fn to_any(&self) -> Any { AttributeAny(*self) }
+impl ToAny for Attribute {
+    fn to_any(&self) -> Any { AttributeAny(self.clone()) }
 }
 
-impl ToAny for TextNode {
-    fn to_any(&self) -> Any { TextAny(*self) }
+impl ToAny for Text {
+    fn to_any(&self) -> Any { TextAny(self.clone()) }
 }
 
-impl ToAny for Child {
+impl ToAny for Root {
+    fn to_any(&self) -> Any { RootAny(self.clone()) }
+}
+
+impl ToAny for ElementChild {
     fn to_any(&self) -> Any {
         match self {
-            &ElementChild(e) => ElementAny(e),
-            &TextChild(e)    => TextAny(e),
+            &ElementElementChild(ref e) => ElementAny(e.clone()),
+            &TextElementChild(ref t)    => TextAny(t.clone()),
         }
     }
 }
 
-impl ToAny for Parent {
+impl ToAny for ElementParent {
     fn to_any(&self) -> Any {
         match self {
-            &ElementParent(e) => ElementAny(e),
+            &ElementElementParent(ref e) => ElementAny(e.clone()),
+            &RootElementParent(ref r)    => RootAny(r.clone()),
         }
     }
 }
 
-#[deriving(Show,PartialEq,Clone)]
+impl ToAny for RootChild {
+    fn to_any(&self) -> Any {
+        match self {
+            &ElementRootChild(ref r) => ElementAny(r.clone()),
+        }
+    }
+}
+
+#[deriving(Clone,PartialEq,Show)]
 pub struct Nodeset {
     nodes: Vec<Any>,
 }
 
 impl Nodeset {
     pub fn new() -> Nodeset {
-        Nodeset{nodes: Vec::new()}
+        Nodeset { nodes: Vec::new() }
     }
 
-    pub fn add<N: ToAny>(& mut self, node: N) {
+    pub fn add<A : ToAny>(&mut self, node: A) {
         self.nodes.push(node.to_any());
-    }
-
-    pub fn add_nodeset(& mut self, nodes: &Nodeset) {
-        self.nodes.push_all(nodes.nodes.as_slice());
-    }
-
-    pub fn size(&self) -> uint {
-        self.nodes.len()
     }
 
     pub fn iter(&self) -> std::slice::Items<Any> {
         self.nodes.iter()
     }
+
+    pub fn add_nodeset(& mut self, other: &Nodeset) {
+        self.nodes.push_all(other.nodes.as_slice());
+    }
+
+    pub fn size(&self) -> uint {
+        self.nodes.len()
+    }
 }
 
 #[test]
-fn can_add_an_element_as_a_child() {
-    let mut d = Document::new();
-    let alpha = d.new_element("alpha");
-    let beta  = d.new_element("beta");
+fn elements_belong_to_a_document() {
+    let doc = Document::new();
+    let element = doc.new_element("alpha".to_string());
 
-    d.append_child(alpha, beta);
-
-    let children = d.children(alpha);
-    assert_eq!(1, children.len());
-
-    let child_elem = children[0].element().unwrap();
-    let result = d.element(child_elem);
-    assert_eq!(result.name(), "beta");
+    assert_eq!(doc, element.document());
 }
 
 #[test]
-fn children_are_ordered() {
-    let mut d = Document::new();
-    let greek = d.new_element("greek");
-    let alpha = d.new_element("alpha");
-    let omega = d.new_element("omega");
+fn elements_can_have_element_children() {
+    let doc = Document::new();
+    let alpha = doc.new_element("alpha".to_string());
+    let beta  = doc.new_element("beta".to_string());
 
-    d.append_child(greek, alpha);
-    d.append_child(greek, omega);
-    let children = d.children(greek);
+    alpha.append_child(beta.clone());
 
-    assert_eq!(2, children.len());
-    let child_elem1 = children[0].element().unwrap();
-    let child_elem2 = children[1].element().unwrap();
-    assert_eq!(d.element(child_elem1).name(), "alpha");
-    assert_eq!(d.element(child_elem2).name(), "omega");
+    let children = alpha.children();
+    let ref child = children[0].element().unwrap();
+
+    assert_eq!(beta, *child);
 }
 
 #[test]
-fn children_know_their_parent() {
-    let mut d = Document::new();
-    let alpha = d.new_element("alpha");
-    let beta  = d.new_element("beta");
+fn element_children_are_ordered() {
+    let doc = Document::new();
+    let greek = doc.new_element("greek".to_string());
+    let alpha = doc.new_element("alpha".to_string());
+    let omega = doc.new_element("omega".to_string());
 
-    d.append_child(alpha, beta);
+    greek.append_child(alpha.clone());
+    greek.append_child(omega.clone());
 
-    let child = d.children(alpha)[0];
-    let parent = d.parent(child).unwrap();
+    let children = greek.children();
 
-    let parent_elem = parent.element().unwrap();
-    let result = d.element(parent_elem);
-    assert_eq!(result.name(), "alpha");
+    assert_eq!(children[0].element().unwrap(), alpha);
+    assert_eq!(children[1].element().unwrap(), omega);
+}
+
+#[test]
+fn element_children_know_their_parent() {
+    let doc = Document::new();
+    let alpha = doc.new_element("alpha".to_string());
+    let beta  = doc.new_element("beta".to_string());
+
+    alpha.append_child(beta);
+
+    let ref child = alpha.children()[0];
+    let parent = child.parent().unwrap();
+
+    assert_eq!(alpha, parent);
 }
 
 #[test]
 fn replacing_parent_updates_original_parent() {
-    let mut d = Document::new();
-    let parent1 = d.new_element("parent1");
-    let parent2 = d.new_element("parent2");
-    let child = d.new_element("child");
+    let doc = Document::new();
+    let parent1 = doc.new_element("parent1".to_string());
+    let parent2 = doc.new_element("parent2".to_string());
+    let child = doc.new_element("child".to_string());
 
-    d.append_child(parent1, child);
-    d.append_child(parent2, child);
+    parent1.append_child(child.clone());
+    parent2.append_child(child.clone());
 
-    assert!(d.children(parent1).is_empty());
-    assert_eq!(1, d.children(parent2).len());
+    assert!(parent1.children().is_empty());
+    assert_eq!(1, parent2.children().len());
 }
 
 #[test]
-fn can_rename_an_element() {
-    let mut d = Document::new();
-    let alpha = d.new_element("alpha");
-
-    {
-        let element = d.mut_element(alpha);
-        element.set_name("beta");
-    }
-
-    let beta = d.element(alpha);
-    assert_eq!(beta.name(), "beta");
+fn elements_can_be_renamed() {
+    let doc = Document::new();
+    let alpha = doc.new_element("alpha".to_string());
+    alpha.set_name("beta".to_string());
+    assert_eq!(alpha.name().as_slice(), "beta");
 }
 
 #[test]
 fn elements_have_attributes() {
-    let mut d = Document::new();
-    let alpha = d.new_element("alpha");
+    let doc = Document::new();
+    let e = doc.new_element("element".to_string());
 
-    d.set_attribute(alpha, "hello", "world");
-    let val = d.get_attribute(alpha, "hello").unwrap();
-    assert_eq!(val, "world");
+    let a = e.set_attribute("hello".to_string(), "world".to_string());
+
+    assert_eq!(doc, a.document());
+}
+
+#[test]
+fn attributes_belong_to_a_document() {
+    let doc = Document::new();
+    let element = doc.new_element("alpha".to_string());
+
+    assert_eq!(doc, element.document());
 }
 
 #[test]
 fn attributes_know_their_element() {
-    let mut d = Document::new();
-    let element = d.new_element("element");
-    let attr = d.set_attribute(element, "hello", "world");
+    let doc = Document::new();
+    let e = doc.new_element("element".to_string());
 
-    assert_eq!(element, d.attribute_parent(attr).unwrap());
+    let a = e.set_attribute("hello".to_string(), "world".to_string());
+
+    assert_eq!(Some(e), a.parent());
 }
 
 #[test]
 fn attributes_can_be_reset() {
-    let mut d = Document::new();
-    let alpha = d.new_element("alpha");
+    let doc = Document::new();
+    let e = doc.new_element("element".to_string());
 
-    d.set_attribute(alpha, "hello", "world");
-    d.set_attribute(alpha, "hello", "universe");
+    e.set_attribute("hello".to_string(), "world".to_string());
+    e.set_attribute("hello".to_string(), "galaxy".to_string());
 
-    let val = d.get_attribute(alpha, "hello").unwrap();
-    assert_eq!(val, "universe");
+    assert_eq!(Some("galaxy".to_string()), e.get_attribute("hello"));
 }
 
 #[test]
 fn attributes_can_be_iterated() {
-    let mut d = Document::new();
-    let e = d.new_element("element");
+    let doc = Document::new();
+    let e = doc.new_element("element".to_string());
 
-    d.set_attribute(e, "name1", "value1");
-    d.set_attribute(e, "name2", "value2");
+    e.set_attribute("name1".to_string(), "value1".to_string());
+    e.set_attribute("name2".to_string(), "value2".to_string());
 
-    let mut attrs: Vec<&Attribute> = d.attributes(e).iter().map(|a| d.attribute(*a)).collect();
-    attrs.sort_by(|a, b| a.name.cmp(&b.name));
+    let mut attrs = e.attributes();
+    attrs.sort_by(|a, b| a.name().cmp(&b.name()));
 
     assert_eq!(2, attrs.len());
-    assert_eq!("name1",  attrs[0].name());
-    assert_eq!("value1", attrs[0].value());
-    assert_eq!("name2",  attrs[1].name());
-    assert_eq!("value2", attrs[1].value());
+    assert_eq!("name1",  attrs[0].name().as_slice());
+    assert_eq!("value1", attrs[0].value().as_slice());
+    assert_eq!("name2",  attrs[1].name().as_slice());
+    assert_eq!("value2", attrs[1].value().as_slice());
 }
 
 #[test]
 fn elements_can_have_text_children() {
-    let mut d = Document::new();
-    let sentence = d.new_element("sentence");
-    let text = d.new_text("Now is the winter of our discontent.");
+    let doc = Document::new();
+    let sentence = doc.new_element("sentence".to_string());
+    let text = doc.new_text("Now is the winter of our discontent.".to_string());
 
-    d.append_child(sentence, text);
+    sentence.append_child(text);
 
-    let children = d.children(sentence);
+    let children = sentence.children();
     assert_eq!(1, children.len());
 
     let child_text = children[0].text().unwrap();
-    assert_eq!(d.text(child_text).value(), "Now is the winter of our discontent.");
+    assert_eq!(child_text.text().as_slice(), "Now is the winter of our discontent.");
+}
+
+#[test]
+fn text_belongs_to_a_document() {
+    let doc = Document::new();
+    let text = doc.new_text("Now is the winter of our discontent.".to_string());
+
+    assert_eq!(doc, text.document());
+}
+
+#[test]
+fn text_knows_its_parent() {
+    let doc = Document::new();
+    let sentence = doc.new_element("sentence".to_string());
+    let text = doc.new_text("Now is the winter of our discontent.".to_string());
+
+    sentence.append_child(text.clone());
+
+    assert_eq!(text.parent().unwrap(), sentence);
 }
 
 #[test]
 fn text_can_be_changed() {
-    let mut d = Document::new();
-    let text = d.new_text("Now is the winter of our discontent.");
+    let doc = Document::new();
+    let text = doc.new_text("Now is the winter of our discontent.".to_string());
 
-    let text_data = d.mut_text(text);
-    text_data.set_value("Made glorious summer by this sun of York");
+    text.set_text("Made glorious summer by this sun of York".to_string());
 
-    assert_eq!(text_data.value(), "Made glorious summer by this sun of York");
+    assert_eq!(text.text().as_slice(), "Made glorious summer by this sun of York");
+}
+
+#[test]
+fn the_root_belongs_to_a_document() {
+    let doc = Document::new();
+    let root = doc.root();
+
+    assert_eq!(doc, root.document());
+}
+
+#[test]
+fn root_can_have_element_children() {
+    let doc = Document::new();
+    let root = doc.root();
+    let element = doc.new_element("alpha".to_string());
+
+    root.append_child(element.clone());
+
+    let children = root.children();
+    assert_eq!(1, children.len());
+
+    let child = children[0].element().unwrap();
+    assert_eq!(child, element);
+}
+
+#[test]
+fn root_has_maximum_of_one_element_child() {
+    let doc = Document::new();
+    let root = doc.root();
+    let alpha = doc.new_element("alpha".to_string());
+    let beta = doc.new_element("beta".to_string());
+
+    root.append_child(alpha.clone());
+    root.append_child(beta.clone());
+
+    let children = root.children();
+    assert_eq!(1, children.len());
+
+    let child = children[0].element().unwrap();
+    assert_eq!(child, beta);
+}
+
+#[test]
+fn element_under_a_root_knows_its_parent_root() {
+    let doc = Document::new();
+    let root = doc.root();
+    let alpha = doc.new_element("alpha".to_string());
+
+    root.append_child(alpha.clone());
+    let parent = alpha.parent().unwrap();
+
+    assert_eq!(root, parent.root().unwrap());
 }
 
 #[test]
 fn nodeset_can_include_all_node_types() {
+    let doc = Document::new();
     let mut nodes = Nodeset::new();
-    let mut d = Document::new();
-    let e = d.new_element("element");
-    let a = d.set_attribute(e, "name", "value");
-    let t = d.new_text("text");
+    let e = doc.new_element("element".to_string());
+    let a = e.set_attribute("name".to_string(), "value".to_string());
+    let t = doc.new_text("text".to_string());
+    let r = doc.root();
 
-    nodes.add(e);
-    nodes.add(a);
-    nodes.add(t);
+    nodes.add(e.clone());
+    nodes.add(a.clone());
+    nodes.add(t.clone());
+    nodes.add(r.clone());
 
     let node_vec: Vec<&Any> = nodes.iter().collect();
 
-    assert_eq!(3, node_vec.len());
+    assert_eq!(4, node_vec.len());
     assert_eq!(e, node_vec[0].element().unwrap());
     assert_eq!(a, node_vec[1].attribute().unwrap());
     assert_eq!(t, node_vec[2].text().unwrap());
+    assert_eq!(r, node_vec[3].root().unwrap());
 }
 
 #[test]
 fn nodesets_can_be_combined() {
+    let doc = Document::new();
     let mut all_nodes = Nodeset::new();
     let mut nodes1 = Nodeset::new();
     let mut nodes2 = Nodeset::new();
 
-    let mut d = Document::new();
-    let e1 = d.new_element("element1");
-    let e2 = d.new_element("element2");
+    let e1 = doc.new_element("element1".to_string());
+    let e2 = doc.new_element("element2".to_string());
 
-    all_nodes.add(e1);
-    all_nodes.add(e2);
+    all_nodes.add(e1.clone());
+    all_nodes.add(e2.clone());
 
-    nodes1.add(e1);
-    nodes2.add(e2);
+    nodes1.add(e1.clone());
+    nodes2.add(e2.clone());
 
     nodes1.add_nodeset(&nodes2);
 
