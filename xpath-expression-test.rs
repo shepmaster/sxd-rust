@@ -29,7 +29,7 @@ use xpath::axis::XPathAxis;
 struct FailExpression;
 
 impl<'n> XPathExpression<'n> for FailExpression {
-    fn evaluate(&self, _: &XPathEvaluationContext<'n>) -> XPathValue<'n> {
+    fn evaluate(&self, _: &XPathEvaluationContext<'n>) -> XPathValue {
         fail!("Should never be called");
     }
 }
@@ -37,7 +37,8 @@ impl<'n> XPathExpression<'n> for FailExpression {
 struct Setup<'a> {
     doc: Document,
     node: Element,
-    funs: HashMap<String, Box<XPathFunction<'a>>>,
+    funs: HashMap<String, Box<XPathFunction>>,
+    vars: HashMap<String, XPathValue>,
 }
 
 impl<'a> Setup<'a> {
@@ -48,11 +49,12 @@ impl<'a> Setup<'a> {
             doc: d,
             node: n,
             funs: HashMap::new(),
+            vars: HashMap::new(),
         }
     }
 
     fn context(& 'a self) -> XPathEvaluationContext<'a> {
-        XPathEvaluationContext::new(self.node.clone(), &self.funs)
+        XPathEvaluationContext::new(self.node.clone(), &self.funs, &self.vars)
     }
 }
 
@@ -145,14 +147,14 @@ fn expression_not_equal_negates_equality() {
     assert_eq!(res, Boolean(true));
 }
 
-struct StubFunction<'n> {
-    value: XPathValue<'n>,
+struct StubFunction {
+    value: XPathValue,
 }
 
-impl<'n> XPathFunction<'n> for StubFunction<'n> {
+impl XPathFunction for StubFunction {
     fn evaluate(&self,
                 _: &XPathEvaluationContext,
-                _: Vec<XPathValue>) -> XPathValue<'n>
+                _: Vec<XPathValue>) -> XPathValue
     {
         self.value.clone()
     }

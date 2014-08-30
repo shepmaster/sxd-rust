@@ -7,14 +7,14 @@ use document::{Nodeset};
 use std::collections::HashMap;
 
 #[deriving(PartialEq,Show,Clone)]
-pub enum XPathValue<'n> {
+pub enum XPathValue {
     Boolean(bool),
     Number(f64),
     String(String),
     Nodes(Nodeset), // rename as Nodeset
 }
 
-impl<'n> XPathValue<'n> {
+impl XPathValue {
     fn boolean(&self) -> bool {
         match *self {
             Boolean(val) => val,
@@ -46,25 +46,28 @@ impl<'n> XPathValue<'n> {
     }
 }
 
-pub trait XPathFunction<'n> {
+pub trait XPathFunction {
     fn evaluate(&self,
                 context: &XPathEvaluationContext,
-                args: Vec<XPathValue>) -> XPathValue<'n>;
+                args: Vec<XPathValue>) -> XPathValue;
 }
 
 pub struct XPathEvaluationContext<'a> {
     node: Any,
-    functions: & 'a HashMap<String, Box<XPathFunction<'a>>>,
+    functions: & 'a HashMap<String, Box<XPathFunction>>,
+    variables: & 'a HashMap<String, XPathValue>,
     position: uint,
 }
 
 impl<'a> XPathEvaluationContext<'a> {
     pub fn new<A: ToAny>(node: A,
-                         functions: & 'a HashMap<String, Box<XPathFunction<'a>>>) -> XPathEvaluationContext<'a>
+                         functions: & 'a HashMap<String, Box<XPathFunction>>,
+                         variables: & 'a HashMap<String, XPathValue>) -> XPathEvaluationContext<'a>
     {
         XPathEvaluationContext {
             node: node.to_any(),
             functions: functions,
+            variables: variables,
             position: 0,
         }
     }
@@ -77,6 +80,7 @@ impl<'a> XPathEvaluationContext<'a> {
         XPathEvaluationContext {
             node: self.node.clone(),
             functions: self.functions,
+            variables: self.variables,
             position: 0,
         }
     }
@@ -89,8 +93,12 @@ impl<'a> XPathEvaluationContext<'a> {
         self.position
     }
 
-    fn function_for_name(&self, name: &str) -> Option<& 'a Box<XPathFunction<'a>>> {
+    fn function_for_name(&self, name: &str) -> Option<& 'a Box<XPathFunction>> {
         self.functions.find(&name.to_string())
+    }
+
+    fn value_of(&self, name: &str) -> Option<&XPathValue> {
+        self.variables.find(&name.to_string())
     }
 }
 
