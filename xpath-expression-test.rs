@@ -21,7 +21,8 @@ use xpath::expression::{ExpressionAnd,
                         ExpressionRelational,
                         ExpressionRootNode,
                         ExpressionStep,
-                        ExpressionUnion};
+                        ExpressionUnion,
+                        ExpressionVariable};
 use xpath::XPathFunction;
 use xpath::XPathEvaluationContext;
 use xpath::axis::XPathAxis;
@@ -348,4 +349,17 @@ fn expression_union_combines_nodesets() {
     expected.add(right_node);
 
     assert_eq!(Nodes(expected), res);
+}
+
+#[test]
+fn expression_variable_looks_up_the_variable() {
+    let mut setup = Setup::new();
+    setup.vars.insert("foo".to_string(), Boolean(true));
+
+    let expr = ExpressionVariable{name: "foo".to_string()};
+
+    let context = setup.context();
+    let res = expr.evaluate(&context);
+
+    assert_eq!(Boolean(true), res);
 }

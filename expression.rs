@@ -328,3 +328,16 @@ impl<'n> XPathExpression<'n> for ExpressionUnion<'n> {
         Nodes(left_val)
     }
 }
+
+pub struct ExpressionVariable {
+    pub name: String,
+}
+
+impl<'n> XPathExpression<'n> for ExpressionVariable {
+    fn evaluate(&self, context: &XPathEvaluationContext<'n>) -> XPathValue {
+        match context.value_of(self.name.as_slice()) {
+            Some(v) => v.clone(),
+            None => fail!("throw UnknownVariableException(_name)"),
+        }
+    }
+}
