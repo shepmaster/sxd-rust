@@ -20,7 +20,8 @@ use xpath::expression::{ExpressionAnd,
                         ExpressionPredicate,
                         ExpressionRelational,
                         ExpressionRootNode,
-                        ExpressionStep};
+                        ExpressionStep,
+                        ExpressionUnion};
 use xpath::XPathFunction;
 use xpath::XPathEvaluationContext;
 use xpath::axis::XPathAxis;
@@ -319,4 +320,30 @@ fn expression_step_delegates_to_the_axis() {
     expr.evaluate(&context);
 
     assert_eq!(1, axis.calls());
+}
+
+#[test]
+fn expression_union_combines_nodesets() {
+    let setup = Setup::new();
+
+    let build = |name: &str| {
+        let node = setup.doc.new_element(name.to_string());
+        let mut nodes = Nodeset::new();
+        nodes.add(node.clone());
+        (node, box ExpressionLiteral{value: Nodes(nodes)})
+    };
+
+    let (left_node, left) = build("left");
+    let (right_node, right) = build("right");
+
+    let expr = ExpressionUnion{left: left, right: right};
+
+    let context = setup.context();
+    let res = expr.evaluate(&context);
+
+    let mut expected = Nodeset::new();
+    expected.add(left_node);
+    expected.add(right_node);
+
+    assert_eq!(Nodes(expected), res);
 }

@@ -314,3 +314,17 @@ impl<'n> XPathExpression<'n> for ExpressionStep {
         Nodes(result)
     }
 }
+
+pub struct ExpressionUnion<'n> {
+    pub left:  Box<XPathExpression<'n>>,
+    pub right: Box<XPathExpression<'n>>,
+}
+
+impl<'n> XPathExpression<'n> for ExpressionUnion<'n> {
+    fn evaluate(&self, context: &XPathEvaluationContext<'n>) -> XPathValue<'n> {
+        let mut left_val = self.left.evaluate(context).nodeset();
+        let right_val = self.right.evaluate(context).nodeset();
+        left_val.add_nodeset(&right_val);
+        Nodes(left_val)
+    }
+}
