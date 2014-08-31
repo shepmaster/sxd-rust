@@ -80,7 +80,7 @@ impl<'a> XPathEvaluationContext<'a> {
         &self.node
     }
 
-    fn new_context_for(& self, size: uint) -> XPathEvaluationContext<'a> {
+    fn new_context_for(& self, _size: uint) -> XPathEvaluationContext<'a> {
         XPathEvaluationContext {
             node: self.node.clone(),
             functions: self.functions,
@@ -89,7 +89,7 @@ impl<'a> XPathEvaluationContext<'a> {
         }
     }
 
-    fn next<A: ToAny>(& mut self, node: A) {
+    fn next<A: ToAny>(& mut self, _node: A) {
         self.position += 1;
     }
 
@@ -109,12 +109,6 @@ impl<'a> XPathEvaluationContext<'a> {
 
 pub trait XPathNodeTest {
     fn test(&self, context: &XPathEvaluationContext, result: &mut Nodeset);
-}
-
-struct EmptyIterator<T>;
-
-impl<T> Iterator<T> for EmptyIterator<T> {
-    fn next(&mut self) -> Option<T> { None }
 }
 
 pub mod token;
