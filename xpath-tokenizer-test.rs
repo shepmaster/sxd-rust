@@ -8,8 +8,8 @@ fn is_finished(tokenizer: & XPathTokenizer) -> bool {
     ! tokenizer.has_more_tokens()
 }
 
-fn all_tokens_raw(tokenizer: XPathTokenizer) -> Result<Vec<XPathToken>, & 'static str> {
-    std::result::collect(tokenizer)
+fn all_tokens_raw(mut tokenizer: XPathTokenizer) -> Result<Vec<XPathToken>, & 'static str> {
+    tokenizer.collect()
 }
 
 fn all_tokens(tokenizer: XPathTokenizer) -> Vec<XPathToken> {
