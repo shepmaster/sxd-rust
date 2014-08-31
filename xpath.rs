@@ -15,7 +15,7 @@ pub enum XPathValue {
 }
 
 impl XPathValue {
-    fn boolean(&self) -> bool {
+    pub fn boolean(&self) -> bool {
         match *self {
             Boolean(val) => val,
             Number(n) => n != 0.0 && ! n.is_nan(),
@@ -24,21 +24,21 @@ impl XPathValue {
         }
     }
 
-    fn number(&self) -> f64 {
+    pub fn number(&self) -> f64 {
         match *self {
             Number(val) => val,
             _ => -42.0
         }
     }
 
-    fn string(&self) -> String {
+    pub fn string(&self) -> String {
         match *self {
             String(ref val) => val.clone(),
             _ => "Unimplemented".to_string(),
         }
     }
 
-    fn nodeset(&self) -> Nodeset {
+    pub fn nodeset(&self) -> Nodeset {
         match *self {
             Nodes(ref ns) => ns.clone(),
             _ => fail!("Did not evaluate to a nodeset!"),
@@ -89,7 +89,7 @@ impl<'a> XPathEvaluationContext<'a> {
         }
     }
 
-    fn next<A: ToAny>(& mut self, _node: A) {
+    pub fn next<A: ToAny>(& mut self, _node: A) {
         self.position += 1;
     }
 
