@@ -52,17 +52,21 @@ pub trait XPathFunction {
                 args: Vec<XPathValue>) -> XPathValue;
 }
 
+type BoxFunc = Box<XPathFunction + 'static>;
+pub type Functions = HashMap<String, BoxFunc>;
+pub type Variables = HashMap<String, XPathValue>;
+
 pub struct XPathEvaluationContext<'a> {
     node: Any,
-    functions: & 'a HashMap<String, Box<XPathFunction>>,
-    variables: & 'a HashMap<String, XPathValue>,
+    functions: & 'a Functions,
+    variables: & 'a Variables,
     position: uint,
 }
 
 impl<'a> XPathEvaluationContext<'a> {
     pub fn new<A: ToAny>(node: A,
-                         functions: & 'a HashMap<String, Box<XPathFunction>>,
-                         variables: & 'a HashMap<String, XPathValue>) -> XPathEvaluationContext<'a>
+                         functions: &'a Functions,
+                         variables: &'a Variables) -> XPathEvaluationContext<'a>
     {
         XPathEvaluationContext {
             node: node.to_any(),
@@ -93,7 +97,7 @@ impl<'a> XPathEvaluationContext<'a> {
         self.position
     }
 
-    fn function_for_name(&self, name: &str) -> Option<& 'a Box<XPathFunction>> {
+    fn function_for_name(&self, name: &str) -> Option<& 'a BoxFunc> {
         self.functions.find(&name.to_string())
     }
 

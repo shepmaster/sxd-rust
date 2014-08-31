@@ -13,9 +13,11 @@ pub trait XPathExpression {
     fn evaluate(& self, context: &XPathEvaluationContext) -> XPathValue;
 }
 
+type SubExpression = Box<XPathExpression + 'static>;
+
 pub struct ExpressionAnd {
-    pub left:  Box<XPathExpression>,
-    pub right: Box<XPathExpression>,
+    pub left:  SubExpression,
+    pub right: SubExpression,
 }
 
 impl XPathExpression for ExpressionAnd {
@@ -36,8 +38,8 @@ impl XPathExpression for ExpressionContextNode {
 }
 
 pub struct ExpressionEqual {
-    pub left:  Box<XPathExpression>,
-    pub right: Box<XPathExpression>,
+    pub left:  SubExpression,
+    pub right: SubExpression,
 }
 
 impl ExpressionEqual {
@@ -66,7 +68,7 @@ pub struct ExpressionNotEqual {
 }
 
 impl ExpressionNotEqual {
-    pub fn new(left: Box<XPathExpression>, right: Box<XPathExpression>) -> ExpressionNotEqual {
+    pub fn new(left: SubExpression, right: SubExpression) -> ExpressionNotEqual {
         ExpressionNotEqual {
             equal: ExpressionEqual{left: left, right: right}
         }
@@ -81,7 +83,7 @@ impl XPathExpression for ExpressionNotEqual {
 
 pub struct ExpressionFunction {
     pub name: String,
-    pub arguments: Vec<Box<XPathExpression>>,
+    pub arguments: Vec<SubExpression>,
 }
 
 impl XPathExpression for ExpressionFunction {
@@ -109,8 +111,8 @@ impl XPathExpression for ExpressionLiteral {
 }
 
 pub struct ExpressionMath {
-    left:  Box<XPathExpression>,
-    right: Box<XPathExpression>,
+    left:  SubExpression,
+    right: SubExpression,
     operation: fn(f64, f64) -> f64,
 }
 
@@ -121,23 +123,23 @@ fn   divide(a: f64, b: f64) -> f64 {a / b}
 fn  modulus(a: f64, b: f64) -> f64 {a % b}
 
 impl ExpressionMath {
-    pub fn addition(left: Box<XPathExpression>, right: Box<XPathExpression>) -> ExpressionMath {
+    pub fn addition(left: SubExpression, right: SubExpression) -> ExpressionMath {
         ExpressionMath{left: left, right: right, operation: add}
     }
 
-    pub fn subtraction(left: Box<XPathExpression>, right: Box<XPathExpression>) -> ExpressionMath {
+    pub fn subtraction(left: SubExpression, right: SubExpression) -> ExpressionMath {
         ExpressionMath{left: left, right: right, operation: subtract}
     }
 
-    pub fn multiplication(left: Box<XPathExpression>, right: Box<XPathExpression>) -> ExpressionMath {
+    pub fn multiplication(left: SubExpression, right: SubExpression) -> ExpressionMath {
         ExpressionMath{left: left, right: right, operation: multiply}
     }
 
-    pub fn division(left: Box<XPathExpression>, right: Box<XPathExpression>) -> ExpressionMath {
+    pub fn division(left: SubExpression, right: SubExpression) -> ExpressionMath {
         ExpressionMath{left: left, right: right, operation: divide}
     }
 
-    pub fn remainder(left: Box<XPathExpression>, right: Box<XPathExpression>) -> ExpressionMath {
+    pub fn remainder(left: SubExpression, right: SubExpression) -> ExpressionMath {
         ExpressionMath{left: left, right: right, operation: modulus}
     }
 }
@@ -152,7 +154,7 @@ impl XPathExpression for ExpressionMath {
 }
 
 pub struct ExpressionNegation {
-    expression: Box<XPathExpression>,
+    expression: SubExpression,
 }
 
 impl XPathExpression for ExpressionNegation {
@@ -163,8 +165,8 @@ impl XPathExpression for ExpressionNegation {
 }
 
 pub struct ExpressionOr {
-    left:  Box<XPathExpression>,
-    right: Box<XPathExpression>,
+    left:  SubExpression,
+    right: SubExpression,
 }
 
 impl XPathExpression for ExpressionOr {
@@ -175,8 +177,8 @@ impl XPathExpression for ExpressionOr {
 }
 
 pub struct ExpressionPath {
-    start_point: Box<XPathExpression>,
-    steps: Vec<Box<XPathExpression>>,
+    start_point: SubExpression,
+    steps: Vec<SubExpression>,
 }
 
 impl XPathExpression for ExpressionPath {
@@ -203,8 +205,8 @@ impl XPathExpression for ExpressionPath {
 }
 
 pub struct ExpressionPredicate {
-    pub node_selector: Box<XPathExpression>,
-    pub predicate: Box<XPathExpression>,
+    pub node_selector: SubExpression,
+    pub predicate: SubExpression,
 }
 
 impl ExpressionPredicate {
@@ -239,8 +241,8 @@ impl XPathExpression for ExpressionPredicate {
 }
 
 pub struct ExpressionRelational {
-    pub  left: Box<XPathExpression>,
-    pub right: Box<XPathExpression>,
+    pub  left: SubExpression,
+    pub right: SubExpression,
     pub operation: fn(f64, f64) -> bool,
 }
 
@@ -250,26 +252,22 @@ fn          greater_than(left: f64, right: f64) -> bool { left >  right }
 fn greater_than_or_equal(left: f64, right: f64) -> bool { left >= right }
 
 impl ExpressionRelational {
-    pub fn less_than(left: Box<XPathExpression>,
-                right: Box<XPathExpression>) -> ExpressionRelational
+    pub fn less_than(left: SubExpression, right: SubExpression) -> ExpressionRelational
     {
         ExpressionRelational{left: left, right: right, operation: less_than}
     }
 
-    pub fn less_than_or_equal(left: Box<XPathExpression>,
-                       right: Box<XPathExpression>) -> ExpressionRelational
+    pub fn less_than_or_equal(left: SubExpression, right: SubExpression) -> ExpressionRelational
     {
         ExpressionRelational{left: left, right: right, operation: less_than_or_equal}
     }
 
-    pub fn greater_than(left: Box<XPathExpression>,
-                   right: Box<XPathExpression>) -> ExpressionRelational
+    pub fn greater_than(left: SubExpression, right: SubExpression) -> ExpressionRelational
     {
         ExpressionRelational{left: left, right: right, operation: greater_than}
     }
 
-    pub fn greater_than_or_equal(left: Box<XPathExpression>,
-                          right: Box<XPathExpression>) -> ExpressionRelational
+    pub fn greater_than_or_equal(left: SubExpression, right: SubExpression) -> ExpressionRelational
     {
         ExpressionRelational{left: left, right: right, operation: greater_than_or_equal}
     }
@@ -296,13 +294,16 @@ impl XPathExpression for ExpressionRootNode {
     }
 }
 
+type StepAxis = Box<XPathAxis + 'static>;
+type StepTest = Box<XPathNodeTest + 'static>;
+
 pub struct ExpressionStep {
-    axis: Box<XPathAxis>,
-    node_test: Box<XPathNodeTest>,
+    axis: StepAxis,
+    node_test: StepTest,
 }
 
 impl ExpressionStep {
-    pub fn new(axis: Box<XPathAxis>, node_test: Box<XPathNodeTest>) -> ExpressionStep {
+    pub fn new(axis: StepAxis, node_test: StepTest) -> ExpressionStep {
         ExpressionStep {axis: axis, node_test: node_test}
     }
 }
@@ -316,8 +317,8 @@ impl XPathExpression for ExpressionStep {
 }
 
 pub struct ExpressionUnion {
-    pub left:  Box<XPathExpression>,
-    pub right: Box<XPathExpression>,
+    pub left:  SubExpression,
+    pub right: SubExpression,
 }
 
 impl XPathExpression for ExpressionUnion {

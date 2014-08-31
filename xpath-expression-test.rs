@@ -25,6 +25,7 @@ use xpath::expression::{ExpressionAnd,
                         ExpressionVariable};
 use xpath::XPathFunction;
 use xpath::XPathEvaluationContext;
+use xpath::{Functions,Variables};
 use xpath::axis::XPathAxis;
 
 struct FailExpression;
@@ -35,15 +36,15 @@ impl XPathExpression for FailExpression {
     }
 }
 
-struct Setup<'a> {
+struct Setup {
     doc: Document,
     node: Element,
-    funs: HashMap<String, Box<XPathFunction>>,
-    vars: HashMap<String, XPathValue>,
+    funs: Functions,
+    vars: Variables,
 }
 
-impl<'a> Setup<'a> {
-    fn new() -> Setup<'a> {
+impl Setup {
+    fn new() -> Setup {
         let d = Document::new();
         let n = d.new_element("test".to_string());
         Setup {
@@ -54,7 +55,7 @@ impl<'a> Setup<'a> {
         }
     }
 
-    fn context(& 'a self) -> XPathEvaluationContext<'a> {
+    fn context(&self) -> XPathEvaluationContext {
         XPathEvaluationContext::new(self.node.clone(), &self.funs, &self.vars)
     }
 }
