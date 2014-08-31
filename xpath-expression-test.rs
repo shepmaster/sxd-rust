@@ -29,8 +29,8 @@ use xpath::axis::XPathAxis;
 
 struct FailExpression;
 
-impl<'n> XPathExpression<'n> for FailExpression {
-    fn evaluate(&self, _: &XPathEvaluationContext<'n>) -> XPathValue {
+impl XPathExpression for FailExpression {
+    fn evaluate(&self, _: &XPathEvaluationContext) -> XPathValue {
         fail!("Should never be called");
     }
 }
