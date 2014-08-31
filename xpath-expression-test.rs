@@ -296,9 +296,9 @@ impl MockAxis {
 
 impl XPathAxis for MockAxis {
     fn select_nodes(&self,
-                    context:   &XPathEvaluationContext,
-                    node_test: &XPathNodeTest,
-                    result:    &mut Nodeset)
+                    _context:   &XPathEvaluationContext,
+                    _node_test: &XPathNodeTest,
+                    _result:    &mut Nodeset)
     {
         *self.calls.borrow_mut() += 1;
     }
@@ -307,7 +307,7 @@ impl XPathAxis for MockAxis {
 struct DummyNodeTest;
 
 impl XPathNodeTest for DummyNodeTest {
-    fn test(&self, context: &XPathEvaluationContext, result: &mut Nodeset) {
+    fn test(&self, _context: &XPathEvaluationContext, _result: &mut Nodeset) {
     }
 }
 
