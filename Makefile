@@ -1,7 +1,18 @@
-all: xpath-tokenizer-test xpath-token-deabbreviator-test xpath-token-disambiguator-test xpath-expression-test libdocument.rlib
+TESTS:= \
+	xpath-tokenizer-test \
+	xpath-token-deabbreviator-test \
+	xpath-token-disambiguator-test \
+	xpath-expression-test \
+	document
+
+LIBS:= \
+	libdocument.rlib \
+	libxpath.rlib
+
+all: $(LIBS) $(TESTS)
 
 clean:
-	rm -f libdocument.rlib libxpath.rlib document
+	rm -f $(LIBS) $(TESTS)
 
 docs:
 	rustdoc document.rs
@@ -9,7 +20,9 @@ docs:
 libdocument.rlib: document.rs
 	rustc -g --crate-type=lib document.rs
 
-libxpath.rlib: xpath.rs tokenizer.rs deabbreviator.rs token.rs disambiguator.rs axis.rs expression.rs
+LIBXPATH_SOURCE:=xpath.rs tokenizer.rs deabbreviator.rs token.rs disambiguator.rs axis.rs expression.rs
+
+libxpath.rlib: $(LIBXPATH_SOURCE) libdocument.rlib
 	rustc -g --crate-type=lib -L . xpath.rs
 
 document: document.rs
