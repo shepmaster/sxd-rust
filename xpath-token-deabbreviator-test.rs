@@ -5,8 +5,8 @@ use xpath::token::XPathToken;
 use xpath::tokenizer::TokenResult;
 use xpath::deabbreviator::XPathTokenDeabbreviator;
 
-fn all_tokens_raw<I: Iterator<TokenResult>>(tokenizer: I) -> Result<Vec<XPathToken>, & 'static str> {
-    std::result::collect(tokenizer)
+fn all_tokens_raw<I: Iterator<TokenResult>>(mut tokenizer: I) -> Result<Vec<XPathToken>, & 'static str> {
+    tokenizer.collect()
 }
 
 fn all_tokens<I: Iterator<TokenResult>>(tokenizer: I) -> Vec<XPathToken> {
