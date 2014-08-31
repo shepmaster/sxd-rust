@@ -6,7 +6,7 @@ use document::ElementAny;
 use super::XPathEvaluationContext;
 use super::XPathNodeTest;
 
-enum PrincipalNodeType {
+pub enum PrincipalNodeType {
   Attribute,
   Element,
 }
