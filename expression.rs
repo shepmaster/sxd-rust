@@ -5,7 +5,7 @@ use document::Nodeset;
 use super::XPathEvaluationContext;
 use super::XPathNodeTest;
 use super::XPathValue;
-use super::{Boolean,Number,String,Nodes};
+use super::{Boolean,Number,Nodes};
 
 use super::axis::XPathAxis;
 
@@ -13,7 +13,7 @@ pub trait XPathExpression {
     fn evaluate(& self, context: &XPathEvaluationContext) -> XPathValue;
 }
 
-type SubExpression = Box<XPathExpression + 'static>;
+pub type SubExpression = Box<XPathExpression + 'static>;
 
 pub struct ExpressionAnd {
     pub left:  SubExpression,
@@ -105,7 +105,7 @@ pub struct ExpressionLiteral {
 }
 
 impl XPathExpression for ExpressionLiteral {
-    fn evaluate(& self, context: &XPathEvaluationContext) -> XPathValue {
+    fn evaluate(& self, _: &XPathEvaluationContext) -> XPathValue {
         self.value.clone()
     }
 }
@@ -294,8 +294,8 @@ impl XPathExpression for ExpressionRootNode {
     }
 }
 
-type StepAxis = Box<XPathAxis + 'static>;
-type StepTest = Box<XPathNodeTest + 'static>;
+pub type StepAxis = Box<XPathAxis + 'static>;
+pub type StepTest = Box<XPathNodeTest + 'static>;
 
 pub struct ExpressionStep {
     axis: StepAxis,
