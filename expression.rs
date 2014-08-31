@@ -43,6 +43,10 @@ pub struct ExpressionEqual {
 }
 
 impl ExpressionEqual {
+    pub fn new(left: SubExpression, right: SubExpression) -> SubExpression {
+        box ExpressionEqual{left: left, right: right} as SubExpression
+    }
+
     fn boolean_evaluate(& self, context: &XPathEvaluationContext) -> bool {
         let left_val = self.left.evaluate(context);
         let right_val = self.right.evaluate(context);
