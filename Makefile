@@ -3,6 +3,7 @@ TESTS:= \
 	xpath-token-deabbreviator-test \
 	xpath-token-disambiguator-test \
 	xpath-expression-test \
+	xpath-parser-test \
 	document
 
 LIBS:= \
@@ -20,7 +21,7 @@ docs:
 libdocument.rlib: document.rs
 	rustc -g --crate-type=lib document.rs
 
-LIBXPATH_SOURCE:=xpath.rs tokenizer.rs deabbreviator.rs token.rs disambiguator.rs axis.rs expression.rs
+LIBXPATH_SOURCE:=xpath.rs tokenizer.rs deabbreviator.rs token.rs disambiguator.rs axis.rs expression.rs parser.rs
 
 libxpath.rlib: $(LIBXPATH_SOURCE) libdocument.rlib
 	rustc -g --crate-type=lib -L . xpath.rs
@@ -40,3 +41,6 @@ xpath-token-disambiguator-test: xpath-token-disambiguator-test.rs libxpath.rlib
 
 xpath-expression-test: xpath-expression-test.rs libxpath.rlib
 	rustc -g -L . --test xpath-expression-test.rs
+
+xpath-parser-test: xpath-parser-test.rs libxpath.rlib
+	rustc -g -L . --test xpath-parser-test.rs

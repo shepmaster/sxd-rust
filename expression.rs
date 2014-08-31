@@ -72,8 +72,8 @@ pub struct ExpressionNotEqual {
 }
 
 impl ExpressionNotEqual {
-    pub fn new(left: SubExpression, right: SubExpression) -> ExpressionNotEqual {
-        ExpressionNotEqual {
+    pub fn new(left: SubExpression, right: SubExpression) -> SubExpression {
+        box ExpressionNotEqual {
             equal: ExpressionEqual{left: left, right: right}
         }
     }
