@@ -21,7 +21,16 @@ docs:
 libdocument.rlib: document.rs
 	rustc -g --crate-type=lib document.rs
 
-LIBXPATH_SOURCE:=xpath.rs tokenizer.rs deabbreviator.rs token.rs disambiguator.rs axis.rs expression.rs parser.rs
+LIBXPATH_SOURCE:= \
+	axis.rs \
+	deabbreviator.rs \
+	disambiguator.rs \
+	expression.rs \
+	function.rs \
+	parser.rs \
+	token.rs \
+	tokenizer.rs \
+	xpath.rs
 
 libxpath.rlib: $(LIBXPATH_SOURCE) libdocument.rlib
 	rustc -g --crate-type=lib -L . xpath.rs
