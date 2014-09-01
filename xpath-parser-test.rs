@@ -7,14 +7,17 @@ use std::collections::hashmap::HashMap;
 
 use document::{Document,Any,ToAny};
 
-use xpath::{Number};
+use xpath::{Boolean,Number,String};
 use xpath::token;
 use xpath::tokenizer::TokenResult;
 use xpath::{Functions,Variables};
 use xpath::{XPathValue,XPathEvaluationContext};
 use xpath::expression::XPathExpression;
 use xpath::parser::XPathParser;
-use xpath::parser::RightHandSideExpressionMissing;
+use xpath::parser::{
+    RightHandSideExpressionMissing,
+    UnexpectedToken,
+};
 
 macro_rules! tokens(
     ($($e:expr),*) => ({
@@ -90,9 +93,11 @@ struct Setup {
 impl Setup {
     fn new() -> Setup {
         let d = Document::new();
+        let mut functions = HashMap::new();
+        xpath::function::register_core_functions(& mut functions);
         Setup {
             node: d.root().to_any(),
-            functions: HashMap::new(),
+            functions: functions,
             variables: HashMap::new(),
             parser: XPathParser::new(),
         }
@@ -296,15 +301,15 @@ impl Setup {
 //   ASSERT_THAT(evaluate_on(expr, top_node).nodeset(), ElementsAre(second));
 // }
 
-// #[test]
-// fn string_literal)
-// {
-//   tokens.add(token::Literal, "string");
+#[test]
+fn string_literal() {
+    let setup = Setup::new();
+    let tokens = tokens![token::Literal("string".to_string())];
 
-//   auto expr = parser->parse();
+  let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-//   assert_eq!("string", evaluate(expr).string());
-// }
+  assert_eq!(String("string".to_string()), setup.evaluate(expr));
+}
 
 // #[test]
 // fn true_function_predicate_selects_all_nodes)
@@ -367,22 +372,22 @@ impl Setup {
 //   ASSERT_THAT(evaluate_on(expr, top_node).nodeset(), ElementsAre(second));
 // }
 
-// #[test]
-// fn functions_accept_arguments)
-// {
-//   tokens.add({
-//       token::Function, "not",
-//       token::LeftParen,
-//       token::Function, "true",
-//       token::LeftParen,
-//       token::RightParen,
-//       token::RightParen,
-//   });
+#[test]
+fn functions_accept_arguments() {
+    let setup = Setup::new();
+    let tokens = tokens![
+      token::Function("not".to_string()),
+      token::LeftParen,
+      token::Function("true".to_string()),
+      token::LeftParen,
+      token::RightParen,
+      token::RightParen,
+  ];
 
-//   auto expr = parser->parse();
+  let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-//   assert_eq!(false, evaluate(expr).boolean());
-// }
+  assert_eq!(Boolean(false), setup.evaluate(expr));
+}
 
 #[test]
 fn numeric_literal() {
@@ -526,19 +531,19 @@ fn repeated_unary_negation() {
     assert_approx_eq!(Number(-7.2), setup.evaluate(expr));
 }
 
-// #[test]
-// fn top_level_function_call)
-// {
-//   tokens.add({
-//       token::Function, "true",
-//       token::LeftParen,
-//       token::RightParen,
-//   });
+#[test]
+fn top_level_function_call() {
+    let setup = Setup::new();
+    let tokens = tokens![
+      token::Function("true".to_string()),
+      token::LeftParen,
+      token::RightParen,
+  ];
 
-//   auto expr = parser->parse();
+  let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-//   assert_eq!(true, evaluate(expr).boolean());
-// }
+  assert_eq!(Boolean(true), setup.evaluate(expr));
+}
 
 // #[test]
 // fn or_expression)
@@ -583,7 +588,7 @@ fn equality_expression() {
 
     let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-    assert_eq!(false, setup.evaluate(expr).boolean());
+    assert_eq!(Boolean(false), setup.evaluate(expr));
 }
 
 #[test]
@@ -597,7 +602,7 @@ fn inequality_expression() {
 
     let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-    assert_eq!(false, setup.evaluate(expr).boolean());
+    assert_eq!(Boolean(false), setup.evaluate(expr));
 }
 
 #[test]
@@ -611,7 +616,7 @@ fn less_than_expression() {
 
     let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-    assert_eq!(false, setup.evaluate(expr).boolean());
+    assert_eq!(Boolean(false), setup.evaluate(expr));
 }
 
 #[test]
@@ -625,7 +630,7 @@ fn less_than_or_equal_expression() {
 
     let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-    assert_eq!(true, setup.evaluate(expr).boolean());
+    assert_eq!(Boolean(true), setup.evaluate(expr));
 }
 
 #[test]
@@ -639,7 +644,7 @@ fn greater_than_expression() {
 
     let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-    assert_eq!(false, setup.evaluate(expr).boolean());
+    assert_eq!(Boolean(false), setup.evaluate(expr));
 }
 
 #[test]
@@ -653,22 +658,22 @@ fn greater_than_or_equal_expression() {
 
     let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-    assert_eq!(true, setup.evaluate(expr).boolean());
+    assert_eq!(Boolean(true), setup.evaluate(expr));
 }
 
-// #[test]
-// fn variable_reference)
-// {
-//   tokens.add({
-//       token::DollarSign,
-//       token::String("variable-name"),
-//   });
+#[test]
+fn variable_reference() {
+    let mut setup = Setup::new();
+    let tokens = tokens![
+      token::DollarSign,
+      token::String("variable-name".to_string()),
+  ];
 
-//   variables.set("variable-name", 12.3);
-//   auto expr = parser->parse();
+  setup.variables.insert("variable-name".to_string(), Number(12.3));
+  let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-//   ASSERT_DOUBLE_EQ(12.3, evaluate(expr).number());
-// }
+  assert_approx_eq!(Number(12.3), setup.evaluate(expr));
+}
 
 // #[test]
 // fn filter_expression)
@@ -794,16 +799,18 @@ fn greater_than_or_equal_expression() {
 //   ASSERT_THROW(parser->parse(), InvalidNodeTestException);
 // }
 
-// #[test]
-// fn unexpected_token_is_reported_as_an_error)
-// {
-//   tokens.add({
-//       token::Function, "does-not-matter",
-//       token::RightParen
-//   });
+#[test]
+fn unexpected_token_is_reported_as_an_error() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::Function("does-not-matter".to_string()),
+        token::RightParen
+    ];
 
-//   ASSERT_THROW(parser->parse(), UnexpectedTokenException);
-// }
+    let res = setup.parser.parse(tokens.move_iter());
+
+    assert_eq!(Some(UnexpectedToken(token::RightParen)), res.err());
+}
 
 // #[test]
 // fn binary_operator_without_right_hand_side_is_reported_as_an_error)
