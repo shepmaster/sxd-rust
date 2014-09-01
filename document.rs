@@ -1,4 +1,5 @@
 #![crate_name = "document"]
+#![feature(macro_rules)]
 
 use std::fmt;
 use std::rc::{Rc,Weak};
@@ -690,6 +691,17 @@ impl ToAny for RootChild {
         }
     }
 }
+
+#[macro_export]
+macro_rules! nodeset(
+    ($($e:expr),*) => ({
+        // leading _ to allow empty construction without a warning.
+        let mut _temp = ::document::Nodeset::new();
+        $(_temp.add($e);)*
+        _temp
+    });
+    ($($e:expr),+,) => (nodeset!($($e),+))
+)
 
 #[deriving(Clone,PartialEq,Show)]
 pub struct Nodeset {

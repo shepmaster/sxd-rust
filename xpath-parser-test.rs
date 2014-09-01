@@ -1,5 +1,7 @@
+#![feature(phase)]
 #![feature(macro_rules)]
 
+#[phase(plugin, link)]
 extern crate document;
 extern crate xpath;
 
@@ -27,16 +29,6 @@ macro_rules! tokens(
         _temp
     });
     ($($e:expr),+,) => (tokens!($($e),+))
-)
-
-macro_rules! nodeset(
-    ($($e:expr),*) => ({
-        // leading _ to allow empty construction without a warning.
-        let mut _temp = ::document::Nodeset::new();
-        $(_temp.add($e);)*
-        _temp
-    });
-    ($($e:expr),+,) => (nodeset!($($e),+))
 )
 
 trait ApproxEq {
