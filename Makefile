@@ -10,13 +10,18 @@ LIBS:= \
 	libdocument.rlib \
 	libxpath.rlib
 
-all: $(LIBS) $(TESTS)
+all: docs $(LIBS) $(TESTS)
 
 clean:
 	rm -f $(LIBS) $(TESTS)
 
-docs:
-	rustdoc document.rs
+docs: document-docs xpath-docs
+
+document-docs: libdocument.rlib document.rs
+	rustdoc -L . document.rs
+
+xpath-docs: libxpath.rlib xpath.rs
+	rustdoc -L . xpath.rs
 
 libdocument.rlib: document.rs
 	rustc -g --crate-type=lib document.rs
