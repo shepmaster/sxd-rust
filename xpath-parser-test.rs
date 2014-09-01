@@ -7,12 +7,14 @@ use std::collections::hashmap::HashMap;
 
 use document::{Document,Any,ToAny};
 
+use xpath::{Number};
 use xpath::token;
 use xpath::tokenizer::TokenResult;
 use xpath::{Functions,Variables};
 use xpath::{XPathValue,XPathEvaluationContext};
 use xpath::expression::XPathExpression;
 use xpath::parser::XPathParser;
+use xpath::parser::RightHandSideExpressionMissing;
 
 macro_rules! tokens(
     ($($e:expr),*) => ({
@@ -22,6 +24,33 @@ macro_rules! tokens(
         _temp
     });
     ($($e:expr),+,) => (tokens!($($e),+))
+)
+
+trait ApproxEq {
+    fn is_approx_eq(&self, other: &Self) -> bool;
+}
+
+impl ApproxEq for f64 {
+    fn is_approx_eq(&self, other: &f64) -> bool {
+        (*self - *other).abs() < 1.0e-6
+    }
+}
+
+impl ApproxEq for XPathValue {
+    fn is_approx_eq(&self, other: &XPathValue) -> bool {
+        match (self, other) {
+            (&Number(ref x), &Number(ref y)) => x.is_approx_eq(y),
+            _ => fail!("It's nonsensical to compare these quantities"),
+        }
+    }
+}
+
+macro_rules! assert_approx_eq(
+    ($a:expr, $b:expr) => ({
+        let (a, b) = (&$a, &$b);
+        assert!(a.is_approx_eq(b),
+                "{} is not approximately equal to {}", *a, *b);
+    })
 )
 
 // class XPathParserTest : public ::testing::Test {
@@ -55,6 +84,7 @@ struct Setup {
     node: Any,
     functions: Functions,
     variables: Variables,
+    parser: XPathParser,
 }
 
 impl Setup {
@@ -64,6 +94,7 @@ impl Setup {
             node: d.root().to_any(),
             functions: HashMap::new(),
             variables: HashMap::new(),
+            parser: XPathParser::new(),
         }
     }
 
@@ -360,141 +391,140 @@ fn numeric_literal() {
         token::Number(3.2),
     ];
 
-    let parser = XPathParser::new();
-    let expr = parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-    assert_eq!(3.2, setup.evaluate(expr).number());
+    assert_approx_eq!(Number(3.2), setup.evaluate(expr));
 }
 
-// #[test]
-// fn addition_of_two_numbers)
-// {
-//   tokens.add({
-//       token::Number(1.1),
-//       token::PlusSign,
-//       token::Number(2.2)
-//   });
+#[test]
+fn addition_of_two_numbers() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::Number(1.1),
+        token::PlusSign,
+        token::Number(2.2)
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-//   ASSERT_DOUBLE_EQ(3.3, evaluate(expr).number());
-// }
+    assert_approx_eq!(Number(3.3), setup.evaluate(expr));
+}
 
-// #[test]
-// fn addition_of_multiple_numbers)
-// {
-//   tokens.add({
-//       token::Number(1.1),
-//       token::PlusSign,
-//       token::Number(2.2),
-//       token::PlusSign,
-//       token::Number(3.3)
-//   });
+#[test]
+fn addition_of_multiple_numbers() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::Number(1.1),
+        token::PlusSign,
+        token::Number(2.2),
+        token::PlusSign,
+        token::Number(3.3)
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-//   ASSERT_DOUBLE_EQ(6.6, evaluate(expr).number());
-// }
+    assert_approx_eq!(Number(6.6), setup.evaluate(expr));
+}
 
-// #[test]
-// fn subtraction_of_two_numbers)
-// {
-//   tokens.add({
-//       token::Number(1.1),
-//       token::MinusSign,
-//       token::Number(2.2),
-//   });
+#[test]
+fn subtraction_of_two_numbers() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::Number(1.1),
+        token::MinusSign,
+        token::Number(2.2),
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-//   ASSERT_DOUBLE_EQ(-1.1, evaluate(expr).number());
-// }
+    assert_approx_eq!(Number(-1.1), setup.evaluate(expr));
+}
 
-// #[test]
-// fn additive_expression_is_left_associative)
-// {
-//   tokens.add({
-//       token::Number(1.1),
-//       token::MinusSign,
-//       token::Number(2.2),
-//       token::MinusSign,
-//       token::Number(3.3),
-//   });
+#[test]
+fn additive_expression_is_left_associative() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::Number(1.1),
+        token::MinusSign,
+        token::Number(2.2),
+        token::MinusSign,
+        token::Number(3.3),
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-//   ASSERT_DOUBLE_EQ(-4.4, evaluate(expr).number());
-// }
+    assert_approx_eq!(Number(-4.4), setup.evaluate(expr));
+}
 
-// #[test]
-// fn multiplication_of_two_numbers)
-// {
-//   tokens.add({
-//       token::Number(1.1),
-//       token::Multiply,
-//       token::Number(2.2),
-//   });
+#[test]
+fn multiplication_of_two_numbers() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::Number(1.1),
+        token::Multiply,
+        token::Number(2.2),
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-//   ASSERT_DOUBLE_EQ(2.42, evaluate(expr).number());
-// }
+    assert_approx_eq!(Number(2.42), setup.evaluate(expr));
+}
 
-// #[test]
-// fn division_of_two_numbers)
-// {
-//   tokens.add({
-//       token::Number(7.1),
-//       token::Divide,
-//       token::Number(0.1),
-//   });
+#[test]
+fn division_of_two_numbers() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::Number(7.1),
+        token::Divide,
+        token::Number(0.1),
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-//   ASSERT_DOUBLE_EQ(71, evaluate(expr).number());
-// }
+    assert_approx_eq!(Number(71.0), setup.evaluate(expr));
+}
 
-// #[test]
-// fn remainder_of_two_numbers)
-// {
-//   tokens.add({
-//       token::Number(7.1),
-//       token::Remainder,
-//       token::Number(3),
-//   });
+#[test]
+fn remainder_of_two_numbers() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::Number(7.1),
+        token::Remainder,
+        token::Number(3.0),
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-//   ASSERT_DOUBLE_EQ(1.1, evaluate(expr).number());
-// }
+    assert_approx_eq!(Number(1.1), setup.evaluate(expr));
+}
 
-// #[test]
-// fn unary_negation)
-// {
-//   tokens.add({
-//       token::MinusSign,
-//       token::Number(7.2),
-//   });
+#[test]
+fn unary_negation() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::MinusSign,
+        token::Number(7.2),
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-//   ASSERT_DOUBLE_EQ(-7.2, evaluate(expr).number());
-// }
+    assert_approx_eq!(Number(-7.2), setup.evaluate(expr));
+}
 
-// #[test]
-// fn repeated_unary_negation)
-// {
-//   tokens.add({
-//       token::MinusSign,
-//       token::MinusSign,
-//       token::MinusSign,
-//       token::Number(7.2),
-//   });
+#[test]
+fn repeated_unary_negation() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::MinusSign,
+        token::MinusSign,
+        token::MinusSign,
+        token::Number(7.2),
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-//   ASSERT_DOUBLE_EQ(-7.2, evaluate(expr).number());
-// }
+    assert_approx_eq!(Number(-7.2), setup.evaluate(expr));
+}
 
 // #[test]
 // fn top_level_function_call)
@@ -551,8 +581,7 @@ fn equality_expression() {
         token::Number(1.1),
     ];
 
-    let parser = XPathParser::new();
-    let expr = parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
     assert_eq!(false, setup.evaluate(expr).boolean());
 }
@@ -566,67 +595,66 @@ fn inequality_expression() {
         token::Number(1.2),
     ];
 
-    let parser = XPathParser::new();
-    let expr = parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
     assert_eq!(false, setup.evaluate(expr).boolean());
 }
 
-// #[test]
-// fn less_than_expression)
-// {
-//   tokens.add({
-//       token::Number(1.2),
-//       token::LessThan,
-//       token::Number(1.2),
-//   });
+#[test]
+fn less_than_expression() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::Number(1.2),
+        token::LessThan,
+        token::Number(1.2),
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-//   assert_eq!(false, evaluate(expr).boolean());
-// }
+    assert_eq!(false, setup.evaluate(expr).boolean());
+}
 
-// #[test]
-// fn less_than_or_equal_expression)
-// {
-//   tokens.add({
-//       token::Number(1.2),
-//       token::LessThanOrEqual,
-//       token::Number(1.2),
-//   });
+#[test]
+fn less_than_or_equal_expression() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::Number(1.2),
+        token::LessThanOrEqual,
+        token::Number(1.2),
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-//   assert_eq!(true, evaluate(expr).boolean());
-// }
+    assert_eq!(true, setup.evaluate(expr).boolean());
+}
 
-// #[test]
-// fn greater_than_expression)
-// {
-//   tokens.add({
-//       token::Number(1.2),
-//       token::GreaterThan,
-//       token::Number(1.2),
-//   });
+#[test]
+fn greater_than_expression() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::Number(1.2),
+        token::GreaterThan,
+        token::Number(1.2),
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-//   assert_eq!(false, evaluate(expr).boolean());
-// }
+    assert_eq!(false, setup.evaluate(expr).boolean());
+}
 
-// #[test]
-// fn greater_than_or_equal_expression)
-// {
-//   tokens.add({
-//       token::Number(1.2),
-//       token::GreaterThanOrEqual,
-//       token::Number(1.2),
-//   });
+#[test]
+fn greater_than_or_equal_expression() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::Number(1.2),
+        token::GreaterThanOrEqual,
+        token::Number(1.2),
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-//   assert_eq!(true, evaluate(expr).boolean());
-// }
+    assert_eq!(true, setup.evaluate(expr).boolean());
+}
 
 // #[test]
 // fn variable_reference)
@@ -788,15 +816,17 @@ fn inequality_expression() {
 //   ASSERT_THROW(parser->parse(), RightHandSideExpressionMissingException);
 // }
 
-// #[test]
-// fn unary_operator_without_right_hand_side_is_reported_as_an_error)
-// {
-//   tokens.add({
-//       token::MinusSign,
-//   });
+#[test]
+fn unary_operator_without_right_hand_side_is_reported_as_an_error() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::MinusSign,
+    ];
 
-//   ASSERT_THROW(parser->parse(), RightHandSideExpressionMissingException);
-// }
+    let res = setup.parser.parse(tokens.move_iter());
+
+    assert_eq!(Some(RightHandSideExpressionMissing), res.err());
+}
 
 // #[test]
 // fn empty_predicate_is_reported_as_an_error)

@@ -9,6 +9,9 @@ use super::{Boolean,Number,Nodes};
 
 use super::axis::XPathAxis;
 
+// TODO: Figure out how to use HOFs to get rid of returning a Box here
+// all the time.
+
 pub trait XPathExpression {
     fn evaluate(& self, context: &XPathEvaluationContext) -> XPathValue;
 }
@@ -127,24 +130,24 @@ fn   divide(a: f64, b: f64) -> f64 {a / b}
 fn  modulus(a: f64, b: f64) -> f64 {a % b}
 
 impl ExpressionMath {
-    pub fn addition(left: SubExpression, right: SubExpression) -> ExpressionMath {
-        ExpressionMath{left: left, right: right, operation: add}
+    pub fn addition(left: SubExpression, right: SubExpression) -> SubExpression {
+        box ExpressionMath{left: left, right: right, operation: add}
     }
 
-    pub fn subtraction(left: SubExpression, right: SubExpression) -> ExpressionMath {
-        ExpressionMath{left: left, right: right, operation: subtract}
+    pub fn subtraction(left: SubExpression, right: SubExpression) -> SubExpression {
+        box ExpressionMath{left: left, right: right, operation: subtract}
     }
 
-    pub fn multiplication(left: SubExpression, right: SubExpression) -> ExpressionMath {
-        ExpressionMath{left: left, right: right, operation: multiply}
+    pub fn multiplication(left: SubExpression, right: SubExpression) -> SubExpression {
+        box ExpressionMath{left: left, right: right, operation: multiply}
     }
 
-    pub fn division(left: SubExpression, right: SubExpression) -> ExpressionMath {
-        ExpressionMath{left: left, right: right, operation: divide}
+    pub fn division(left: SubExpression, right: SubExpression) -> SubExpression {
+        box ExpressionMath{left: left, right: right, operation: divide}
     }
 
-    pub fn remainder(left: SubExpression, right: SubExpression) -> ExpressionMath {
-        ExpressionMath{left: left, right: right, operation: modulus}
+    pub fn remainder(left: SubExpression, right: SubExpression) -> SubExpression {
+        box ExpressionMath{left: left, right: right, operation: modulus}
     }
 }
 
@@ -158,7 +161,7 @@ impl XPathExpression for ExpressionMath {
 }
 
 pub struct ExpressionNegation {
-    expression: SubExpression,
+    pub expression: SubExpression,
 }
 
 impl XPathExpression for ExpressionNegation {
@@ -256,24 +259,24 @@ fn          greater_than(left: f64, right: f64) -> bool { left >  right }
 fn greater_than_or_equal(left: f64, right: f64) -> bool { left >= right }
 
 impl ExpressionRelational {
-    pub fn less_than(left: SubExpression, right: SubExpression) -> ExpressionRelational
+    pub fn less_than(left: SubExpression, right: SubExpression) -> SubExpression
     {
-        ExpressionRelational{left: left, right: right, operation: less_than}
+        box ExpressionRelational{left: left, right: right, operation: less_than}
     }
 
-    pub fn less_than_or_equal(left: SubExpression, right: SubExpression) -> ExpressionRelational
+    pub fn less_than_or_equal(left: SubExpression, right: SubExpression) -> SubExpression
     {
-        ExpressionRelational{left: left, right: right, operation: less_than_or_equal}
+        box ExpressionRelational{left: left, right: right, operation: less_than_or_equal}
     }
 
-    pub fn greater_than(left: SubExpression, right: SubExpression) -> ExpressionRelational
+    pub fn greater_than(left: SubExpression, right: SubExpression) -> SubExpression
     {
-        ExpressionRelational{left: left, right: right, operation: greater_than}
+        box ExpressionRelational{left: left, right: right, operation: greater_than}
     }
 
-    pub fn greater_than_or_equal(left: SubExpression, right: SubExpression) -> ExpressionRelational
+    pub fn greater_than_or_equal(left: SubExpression, right: SubExpression) -> SubExpression
     {
-        ExpressionRelational{left: left, right: right, operation: greater_than_or_equal}
+        box ExpressionRelational{left: left, right: right, operation: greater_than_or_equal}
     }
 }
 

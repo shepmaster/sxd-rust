@@ -5,9 +5,14 @@ use super::token;
 use super::token::XPathToken;
 use super::tokenizer::TokenResult;
 use super::expression::XPathExpression;
-use super::expression::{ExpressionEqual,
-                        ExpressionLiteral,
-                        ExpressionNotEqual};
+use super::expression::{
+    ExpressionEqual,
+    ExpressionLiteral,
+    ExpressionMath,
+    ExpressionNegation,
+    ExpressionNotEqual,
+    ExpressionRelational,
+};
 
 pub struct XPathParser;
 
@@ -27,16 +32,14 @@ pub enum ParseErr {
 
 pub type ParseResult = Result<Option<SubExpression>, ParseErr>;
 
-type ParseFn<I> = fn(XPathParserTokenSource<I>) -> ParseResult;
 type BinaryExpressionBuilder = fn(SubExpression, SubExpression) -> SubExpression;
 
 struct BinaryRule {
-    token_type: XPathToken,
+    token: XPathToken,
     builder: BinaryExpressionBuilder,
 }
 
 struct LeftAssociativeBinaryParser<I> {
-    child_parse: ParseFn<I>,
     rules: Vec<BinaryRule>,
 }
 
@@ -69,15 +72,14 @@ impl<I: Iterator<TokenResult>> XCompat for Peekable<TokenResult, I> {
 }
 
 impl<I : Iterator<TokenResult>> LeftAssociativeBinaryParser<I> {
-    fn new(child_parse: ParseFn<I>, rules: Vec<BinaryRule>) -> LeftAssociativeBinaryParser<I> {
+    fn new(rules: Vec<BinaryRule>) -> LeftAssociativeBinaryParser<I> {
         LeftAssociativeBinaryParser {
-            child_parse: child_parse,
             rules: rules,
         }
     }
 
-    fn parse(&self, source: &mut Peekable<TokenResult, I>) -> ParseResult {
-        let left = try!((self.child_parse)(source));
+    fn parse(&self, source: &mut Peekable<TokenResult, I>, child_parse: |&mut Peekable<TokenResult, I>| -> ParseResult) -> ParseResult {
+        let left = try!(child_parse(source));
 
         let mut left = match left {
             None => return Ok(None),
@@ -88,10 +90,10 @@ impl<I : Iterator<TokenResult>> LeftAssociativeBinaryParser<I> {
             let mut found = false;
 
             for rule in self.rules.iter() {
-                if source.next_token_is(&rule.token_type) {
-                    source.consume(&rule.token_type);
+                if source.next_token_is(&rule.token) {
+                    source.consume(&rule.token);
 
-                    let right = try!((self.child_parse)(source));
+                    let right = try!(child_parse(source));
 
                     let right = match right {
                         None => return Err(RightHandSideExpressionMissing),
@@ -421,74 +423,74 @@ fn parse_numeric_literal<I : Iterator<TokenResult>>(source: &mut Peekable<TokenR
 //   return parser.parse(source);
 // }
 
-// std::unique_ptr<XPathExpression>
-// parse_unary_expression(XPathParserTokenSource &source)
-// {
-//   auto expr = parse_union_expression(source);
-//   if (expr) return expr;
+impl<I : Iterator<TokenResult>> XPathParser {
 
-//   if (source.next_token_is(token::MinusSign)) {
-//     source.consume(token::MinusSign);
+    fn parse_unary_expression(&self, source: &mut Peekable<TokenResult, I>) -> ParseResult {
+        // TODO: reset to parse_union_expression
+        let expr = try!(parse_numeric_literal(source));
+        if expr.is_some() {
+            return Ok(expr);
+        }
 
-//     expr = parse_unary_expression(source);
-//     if (! expr) {
-//       throw RightHandSideExpressionMissingException();
-//     }
+        if source.next_token_is(&token::MinusSign) {
+            source.consume(&token::MinusSign);
 
-//     return make_unique<ExpressionNegation>(move(expr));
-//   }
+            let expr = try!(self.parse_unary_expression(source));
 
-//   return nullptr;
-// }
+            match expr {
+                Some(expr) => {
+                    let expr: SubExpression = box ExpressionNegation { expression: expr };
+                    Ok(Some(expr))
+                },
+                None => Err(RightHandSideExpressionMissing),
+            }
+        } else {
+            Ok(None)
+        }
+    }
 
-// std::unique_ptr<XPathExpression>
-// parse_multiplicative_expression(XPathParserTokenSource &source)
-// {
-//   std::vector<BinaryRule<ExpressionMath>> rules = {
-//     { token::Multiply,  ExpressionMath::Multiplication },
-//     { token::Divide,    ExpressionMath::Division },
-//     { token::Remainder, ExpressionMath::Remainder }
-//   };
+    fn parse_multiplicative_expression(&self, source: &mut Peekable<TokenResult, I>) -> ParseResult {
+        let rules = vec![
+            BinaryRule { token: token::Multiply,  builder: ExpressionMath::multiplication },
+            BinaryRule { token: token::Divide,    builder: ExpressionMath::division },
+            BinaryRule { token: token::Remainder, builder: ExpressionMath::remainder }
+        ];
 
-//   LeftAssociativeBinaryParser<ExpressionMath> parser(parse_unary_expression, rules);
-//   return parser.parse(source);
-// }
+        let parser = LeftAssociativeBinaryParser::new(rules);
+        parser.parse(source, |source| self.parse_unary_expression(source))
+    }
 
-// std::unique_ptr<XPathExpression>
-// parse_additive_expression(XPathParserTokenSource &source)
-// {
-//   std::vector<BinaryRule<ExpressionMath>> rules = {
-//     { token::PlusSign,  ExpressionMath::Addition },
-//     { token::MinusSign, ExpressionMath::Subtraction}
-//   };
+    fn parse_additive_expression(&self, source: &mut Peekable<TokenResult, I>) -> ParseResult {
+        let rules = vec![
+            BinaryRule { token: token::PlusSign,  builder: ExpressionMath::addition },
+            BinaryRule { token: token::MinusSign, builder: ExpressionMath::subtraction}
+        ];
 
-//   LeftAssociativeBinaryParser<ExpressionMath> parser(parse_multiplicative_expression, rules);
-//   return parser.parse(source);
-// }
+        let parser = LeftAssociativeBinaryParser::new(rules);
+        parser.parse(source, |source| self.parse_multiplicative_expression(source))
+    }
 
-// std::unique_ptr<XPathExpression>
-// parse_relational_expression(XPathParserTokenSource &source)
-// {
-//   std::vector<BinaryRule<ExpressionRelational>> rules = {
-//     { token::LessThan,           ExpressionRelational::LessThan },
-//     { token::LessThanOrEqual,    ExpressionRelational::LessThanOrEqual },
-//     { token::GreaterThan,        ExpressionRelational::GreaterThan },
-//     { token::GreaterThanOrEqual, ExpressionRelational::GreaterThanOrEqual },
-//   };
+    fn parse_relational_expression(&self, source: &mut Peekable<TokenResult, I>) -> ParseResult {
+        let rules = vec![
+            BinaryRule { token: token::LessThan,           builder: ExpressionRelational::less_than },
+            BinaryRule { token: token::LessThanOrEqual,    builder: ExpressionRelational::less_than_or_equal },
+            BinaryRule { token: token::GreaterThan,        builder: ExpressionRelational::greater_than },
+            BinaryRule { token: token::GreaterThanOrEqual, builder: ExpressionRelational::greater_than_or_equal },
+        ];
 
-//   LeftAssociativeBinaryParser<ExpressionRelational> parser(parse_additive_expression, rules);
-//   return parser.parse(source);
-// }
+        let parser = LeftAssociativeBinaryParser::new(rules);
+        parser.parse(source, |source| self.parse_additive_expression(source))
+    }
 
-fn parse_equality_expression<I : Iterator<TokenResult>>(source: &mut Peekable<TokenResult, I>) -> ParseResult {
-    let rules = vec![
-        BinaryRule { token_type: token::Equal,    builder: ExpressionEqual::new },
-        BinaryRule { token_type: token::NotEqual, builder: ExpressionNotEqual::new },
-    ];
+    fn parse_equality_expression(&self, source: &mut Peekable<TokenResult, I>) -> ParseResult {
+        let rules = vec![
+            BinaryRule { token: token::Equal,    builder: ExpressionEqual::new },
+            BinaryRule { token: token::NotEqual, builder: ExpressionNotEqual::new },
+        ];
 
-    // TODO reset to parse_relational_expression
-    let parser = LeftAssociativeBinaryParser::new(parse_numeric_literal, rules);
-    return parser.parse(source);
+        let parser = LeftAssociativeBinaryParser::new(rules);
+        return parser.parse(source, |source| self.parse_relational_expression(source));
+    }
 }
 
 // std::unique_ptr<XPathExpression>
@@ -518,7 +520,7 @@ impl<I : Iterator<TokenResult>> XPathParser {
         let mut source = source.peekable();
 
         // TODO: reset to parse_or_expression
-        let expr = try!(parse_equality_expression(&mut source));
+        let expr = try!(self.parse_equality_expression(&mut source));
 
         if source.has_more_tokens() {
             return Err(ExtraUnparsedTokens);
