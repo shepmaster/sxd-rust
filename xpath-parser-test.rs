@@ -306,9 +306,9 @@ fn string_literal() {
     let setup = Setup::new();
     let tokens = tokens![token::Literal("string".to_string())];
 
-  let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-  assert_eq!(String("string".to_string()), setup.evaluate(expr));
+    assert_eq!(String("string".to_string()), setup.evaluate(expr));
 }
 
 // #[test]
@@ -545,37 +545,37 @@ fn top_level_function_call() {
   assert_eq!(Boolean(true), setup.evaluate(expr));
 }
 
-// #[test]
-// fn or_expression)
-// {
-//   tokens.add({
-//       token::Function, "true",
-//       token::LeftParen,
-//       token::RightParen,
-//       token::Or,
-//       token::Function, "false",
-//       token::LeftParen,
-//       token::RightParen,
-//   });
+#[test]
+fn or_expression() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::Function("true".to_string()),
+        token::LeftParen,
+        token::RightParen,
+        token::Or,
+        token::Function("false".to_string()),
+        token::LeftParen,
+        token::RightParen,
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-//   assert_eq!(true, evaluate(expr).boolean());
-// }
+    assert_eq!(Boolean(true), setup.evaluate(expr));
+}
 
-// #[test]
-// fn and_expression)
-// {
-//   tokens.add({
-//       token::Number(1.2),
-//       token::And,
-//       token::Number(0),
-//   });
+#[test]
+fn and_expression() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::Number(1.2),
+        token::And,
+        token::Number(0.0),
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-//   assert_eq!(false, evaluate(expr).boolean());
-// }
+    assert_eq!(Boolean(false), setup.evaluate(expr));
+}
 
 #[test]
 fn equality_expression() {

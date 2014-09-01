@@ -18,10 +18,22 @@ pub trait XPathExpression {
 
 pub type SubExpression = Box<XPathExpression + 'static>;
 
+macro_rules! binary_constructor(
+    ($t:ident) => (
+        impl $t {
+            pub fn new(left: SubExpression, right: SubExpression) -> SubExpression {
+                box $t{left: left, right: right} as SubExpression
+            }
+        }
+    );
+)
+
 pub struct ExpressionAnd {
     pub left:  SubExpression,
     pub right: SubExpression,
 }
+
+binary_constructor!(ExpressionAnd)
 
 impl XPathExpression for ExpressionAnd {
     fn evaluate(& self, context: &XPathEvaluationContext) -> XPathValue {
@@ -45,11 +57,9 @@ pub struct ExpressionEqual {
     pub right: SubExpression,
 }
 
-impl ExpressionEqual {
-    pub fn new(left: SubExpression, right: SubExpression) -> SubExpression {
-        box ExpressionEqual{left: left, right: right} as SubExpression
-    }
+binary_constructor!(ExpressionEqual)
 
+impl ExpressionEqual {
     fn boolean_evaluate(& self, context: &XPathEvaluationContext) -> bool {
         let left_val = self.left.evaluate(context);
         let right_val = self.right.evaluate(context);
@@ -175,6 +185,8 @@ pub struct ExpressionOr {
     left:  SubExpression,
     right: SubExpression,
 }
+
+binary_constructor!(ExpressionOr)
 
 impl XPathExpression for ExpressionOr {
     fn evaluate(& self, context: &XPathEvaluationContext) -> XPathValue {

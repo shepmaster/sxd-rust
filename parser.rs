@@ -6,12 +6,14 @@ use super::token::XPathToken;
 use super::tokenizer::TokenResult;
 use super::expression::XPathExpression;
 use super::expression::{
+    ExpressionAnd,
     ExpressionEqual,
     ExpressionFunction,
     ExpressionLiteral,
     ExpressionMath,
     ExpressionNegation,
     ExpressionNotEqual,
+    ExpressionOr,
     ExpressionRelational,
     ExpressionVariable,
 };
@@ -520,38 +522,32 @@ impl<I : Iterator<TokenResult>> XPathParser {
         ];
 
         let parser = LeftAssociativeBinaryParser::new(rules);
-        return parser.parse(source, |source| self.parse_relational_expression(source));
+        parser.parse(source, |source| self.parse_relational_expression(source))
     }
-}
 
-// std::unique_ptr<XPathExpression>
-// parse_and_expression(XPathParserTokenSource &source)
-// {
-//   std::vector<BinaryRule<ExpressionAnd>> rules = {
-//     { token::And, ExpressionAnd::And }
-//   };
+    fn parse_and_expression(&self, source: TokenSource<I>) -> ParseResult {
+        let rules = vec![
+            BinaryRule { token: token::And, builder: ExpressionAnd::new }
+        ];
 
-//   LeftAssociativeBinaryParser<ExpressionAnd> parser(parse_equality_expression, rules);
-//   return parser.parse(source);
-// }
+        let parser = LeftAssociativeBinaryParser::new(rules);
+        parser.parse(source, |source| self.parse_equality_expression(source))
+    }
 
-// std::unique_ptr<XPathExpression>
-// parse_or_expression(XPathParserTokenSource &source)
-// {
-//   std::vector<BinaryRule<ExpressionOr>> rules = {
-//     { token::Or, ExpressionOr::Or }
-//   };
+    fn parse_or_expression(&self, source: TokenSource<I>) -> ParseResult
+    {
+        let rules = vec![
+            BinaryRule { token: token::Or, builder: ExpressionOr::new }
+        ];
 
-//   LeftAssociativeBinaryParser<ExpressionOr> parser(parse_and_expression, rules);
-//   return parser.parse(source);
-// }
+        let parser = LeftAssociativeBinaryParser::new(rules);
+        parser.parse(source, |source| self.parse_and_expression(source))
+    }
 
-impl<I : Iterator<TokenResult>> XPathParser {
     pub fn parse(&self, source: I) -> ParseResult {
         let mut source = source.peekable();
 
-        // TODO: reset to parse_or_expression
-        let expr = try!(self.parse_equality_expression(&mut source));
+        let expr = try!(self.parse_or_expression(&mut source));
 
         if source.has_more_tokens() {
             return Err(ExtraUnparsedTokens);
