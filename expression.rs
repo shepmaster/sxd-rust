@@ -340,6 +340,8 @@ pub struct ExpressionUnion {
     pub right: SubExpression,
 }
 
+binary_constructor!(ExpressionUnion)
+
 impl XPathExpression for ExpressionUnion {
     fn evaluate(&self, context: &XPathEvaluationContext) -> XPathValue {
         let mut left_val = self.left.evaluate(context).nodeset();

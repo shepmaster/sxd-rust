@@ -15,6 +15,7 @@ use super::expression::{
     ExpressionNotEqual,
     ExpressionOr,
     ExpressionRelational,
+    ExpressionUnion,
     ExpressionVariable,
 };
 
@@ -445,22 +446,20 @@ impl<I : Iterator<TokenResult>> XPathParser {
 //   return nullptr;
 // }
 
-// std::unique_ptr<XPathExpression>
-// parse_union_expression(XPathParserTokenSource &source)
-// {
-//   std::vector<BinaryRule<ExpressionUnion>> rules = {
-//     { token::Pipe, ExpressionUnion::Union }
-//   };
-
-//   LeftAssociativeBinaryParser<ExpressionUnion> parser(parse_path_expression, rules);
-//   return parser.parse(source);
-// }
-
 impl<I : Iterator<TokenResult>> XPathParser {
 
+    fn parse_union_expression(&self, source: TokenSource<I>) -> ParseResult {
+        let rules = vec![
+            BinaryRule { token: token::Pipe, builder: ExpressionUnion::new }
+        ];
+
+        let parser = LeftAssociativeBinaryParser::new(rules);
+        // TODO: parse_path_expression
+        parser.parse(source, |source| self.parse_primary_expression(source))
+    }
+
     fn parse_unary_expression(&self, source: TokenSource<I>) -> ParseResult {
-        // TODO: reset to parse_union_expression
-        let expr = try!(self.parse_primary_expression(source));
+        let expr = try!(self.parse_union_expression(source));
         if expr.is_some() {
             return Ok(expr);
         }

@@ -5,9 +5,9 @@ extern crate xpath;
 
 use std::collections::hashmap::HashMap;
 
-use document::{Document,Any,ToAny};
+use document::{Document,Element,ToAny};
 
-use xpath::{Boolean,Number,String};
+use xpath::{Boolean,Number,String,Nodes};
 use xpath::token;
 use xpath::tokenizer::TokenResult;
 use xpath::{Functions,Variables};
@@ -27,6 +27,16 @@ macro_rules! tokens(
         _temp
     });
     ($($e:expr),+,) => (tokens!($($e),+))
+)
+
+macro_rules! nodeset(
+    ($($e:expr),*) => ({
+        // leading _ to allow empty construction without a warning.
+        let mut _temp = ::document::Nodeset::new();
+        $(_temp.add($e);)*
+        _temp
+    });
+    ($($e:expr),+,) => (nodeset!($($e),+))
 )
 
 trait ApproxEq {
@@ -66,12 +76,6 @@ macro_rules! assert_approx_eq(
 //     XPathCoreFunctionLibrary::register_functions(functions);
 //   }
 
-//   Element *add_child(Element *parent, std::string name) {
-//     auto n = doc.new_element(name);
-//     parent->append_child(n);
-//     return n;
-//   }
-
 //   Attribute *add_attribute(Element *element, std::string name, std::string value) {
 //     return element->set_attribute(name, value);
 //   }
@@ -84,7 +88,8 @@ macro_rules! assert_approx_eq(
 // };
 
 struct Setup {
-    node: Any,
+    doc: Document,
+    top_node: Element,
     functions: Functions,
     variables: Variables,
     parser: XPathParser,
@@ -93,19 +98,30 @@ struct Setup {
 impl Setup {
     fn new() -> Setup {
         let d = Document::new();
+        let e = d.new_element("the-top-node".to_string());
+        d.root().append_child(e.clone());
+
         let mut functions = HashMap::new();
         xpath::function::register_core_functions(& mut functions);
+
         Setup {
-            node: d.root().to_any(),
+            doc: d,
+            top_node: e,
             functions: functions,
             variables: HashMap::new(),
             parser: XPathParser::new(),
         }
     }
 
+    fn add_child(&self, parent: &Element, name: &str) -> Element {
+        let n = self.doc.new_element(name.to_string());
+        parent.append_child(n.clone());
+        n
+  }
+
     fn evaluate(&self, expr: &XPathExpression) -> XPathValue {
-        let mut context = XPathEvaluationContext::new(self.node.clone(), &self.functions, &self.variables);
-        context.next(self.node.clone());
+        let mut context = XPathEvaluationContext::new(self.top_node.to_any(), &self.functions, &self.variables);
+        context.next(self.top_node.to_any());
         expr.evaluate(&context)
     }
 }
@@ -718,31 +734,30 @@ fn variable_reference() {
 //   ASSERT_THAT(evaluate(expr).nodeset(), ElementsAre(child));
 // }
 
-// #[test]
-// fn union_expression)
-// {
-//   tokens.add({
-//       token::DollarSign,
-//       token::String("variable1"),
-//       token::Pipe,
-//       token::DollarSign,
-//       token::String("variable2"),
-//   });
+#[test]
+fn union_expression()
+{
+    let mut setup = Setup::new();
+    let tokens = tokens![
+        token::DollarSign,
+        token::String("variable1".to_string()),
+        token::Pipe,
+        token::DollarSign,
+        token::String("variable2".to_string()),
+    ];
 
-//   Nodeset value1;
-//   auto node1 = add_child(top_node, "first-node");
-//   value1.add(node1);
-//   variables.set("variable1", value1);
+    let node1 = setup.add_child(&setup.top_node, "first-node");
+    let value1 = nodeset![node1.clone()];
+    setup.variables.insert("variable1".to_string(), Nodes(value1));
 
-//   Nodeset value2;
-//   auto node2 = add_child(top_node, "second-node");
-//   value2.add(node2);
-//   variables.set("variable2", value2);
+    let node2 = setup.add_child(&setup.top_node, "second-node");
+    let value2 = nodeset![node2.clone()];
+    setup.variables.insert("variable2".to_string(), Nodes(value2));
 
-//   auto expr = parser->parse();
+    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
 
-//   ASSERT_THAT(evaluate(expr).nodeset(), ElementsAre(node1, node2));
-// }
+    assert_eq!(Nodes(nodeset![node1, node2]), setup.evaluate(expr));
+}
 
 // #[test]
 // fn absolute_path_expression)
