@@ -1,13 +1,11 @@
-extern crate document;
-
 use document::Nodeset;
 
 use super::XPathEvaluationContext;
-use super::XPathNodeTest;
 use super::XPathValue;
 use super::{Boolean,Number,Nodes};
 
 use super::axis::XPathAxis;
+use super::node_test::XPathNodeTest;
 
 // TODO: Figure out how to use HOFs to get rid of returning a Box here
 // all the time.

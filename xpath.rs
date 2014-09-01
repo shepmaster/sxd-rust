@@ -107,16 +107,12 @@ impl<'a> XPathEvaluationContext<'a> {
     }
 }
 
-
-pub trait XPathNodeTest {
-    fn test(&self, context: &XPathEvaluationContext, result: &mut Nodeset);
-}
-
-pub mod token;
-pub mod tokenizer;
+pub mod axis;
 pub mod deabbreviator;
 pub mod disambiguator;
-pub mod axis;
 pub mod expression;
-pub mod parser;
 pub mod function;
+pub mod node_test;
+pub mod parser;
+pub mod token;
+pub mod tokenizer;

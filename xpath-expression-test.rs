@@ -9,7 +9,10 @@ use document::{Document,Element,Nodeset};
 
 use xpath::XPathValue;
 use xpath::{Boolean, Number, String, Nodes};
-use xpath::XPathNodeTest;
+use xpath::{Functions,Variables};
+use xpath::XPathFunction;
+use xpath::XPathEvaluationContext;
+
 use xpath::expression::XPathExpression;
 use xpath::expression::{ExpressionAnd,
                         ExpressionEqual,
@@ -23,10 +26,9 @@ use xpath::expression::{ExpressionAnd,
                         ExpressionStep,
                         ExpressionUnion,
                         ExpressionVariable};
-use xpath::XPathFunction;
-use xpath::XPathEvaluationContext;
-use xpath::{Functions,Variables};
+
 use xpath::axis::XPathAxis;
+use xpath::node_test::XPathNodeTest;
 
 struct FailExpression;
 

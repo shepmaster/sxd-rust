@@ -4,7 +4,7 @@ use document::Nodeset;
 use document::ElementAny;
 
 use super::XPathEvaluationContext;
-use super::XPathNodeTest;
+use super::node_test::XPathNodeTest;
 
 pub enum PrincipalNodeType {
   Attribute,

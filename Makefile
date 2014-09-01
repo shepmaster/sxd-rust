@@ -1,9 +1,10 @@
 TESTS:= \
-	xpath-tokenizer-test \
+	xpath-expression-test \
+	xpath-node-test-test \
+	xpath-parser-test \
 	xpath-token-deabbreviator-test \
 	xpath-token-disambiguator-test \
-	xpath-expression-test \
-	xpath-parser-test \
+	xpath-tokenizer-test \
 	document
 
 LIBS:= \
@@ -32,6 +33,7 @@ LIBXPATH_SOURCE:= \
 	disambiguator.rs \
 	expression.rs \
 	function.rs \
+	node_test.rs \
 	parser.rs \
 	token.rs \
 	tokenizer.rs \
@@ -55,6 +57,9 @@ xpath-token-disambiguator-test: xpath-token-disambiguator-test.rs libxpath.rlib
 
 xpath-expression-test: xpath-expression-test.rs libxpath.rlib
 	rustc -g -L . --test xpath-expression-test.rs
+
+xpath-node-test-test: xpath-node-test-test.rs libxpath.rlib
+	rustc -g -L . --test xpath-node-test-test.rs
 
 xpath-parser-test: xpath-parser-test.rs libxpath.rlib
 	rustc -g -L . --test xpath-parser-test.rs
