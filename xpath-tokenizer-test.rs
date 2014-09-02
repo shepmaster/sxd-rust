@@ -2,23 +2,27 @@ extern crate xpath;
 
 use xpath::token;
 use xpath::token::XPathToken;
+
 use xpath::tokenizer::XPathTokenizer;
-use xpath::tokenizer::TokenizerErr;
+use xpath::tokenizer::{TokenResult,TokenizerErr};
 use xpath::tokenizer::{
     MismatchedQuoteCharacters,
     MissingLocalName,
     UnableToCreateToken,
 };
 
+use xpath::tokenizer::XPathTokenDisambiguator;
+use xpath::tokenizer::XPathTokenDeabbreviator;
+
 fn is_finished(tokenizer: & XPathTokenizer) -> bool {
     ! tokenizer.has_more_tokens()
 }
 
-fn all_tokens_raw(mut tokenizer: XPathTokenizer) -> Result<Vec<XPathToken>, TokenizerErr> {
+fn all_tokens_raw<I: Iterator<TokenResult>>(mut tokenizer: I) -> Result<Vec<XPathToken>, TokenizerErr> {
     tokenizer.collect()
 }
 
-fn all_tokens(tokenizer: XPathTokenizer) -> Vec<XPathToken> {
+fn all_tokens<I: Iterator<TokenResult>>(tokenizer: I) -> Vec<XPathToken> {
     match all_tokens_raw(tokenizer) {
         Ok(toks) => toks,
         Err(msg) => fail!(msg),
@@ -383,4 +387,103 @@ fn exception_thrown_when_quote_characters_mismatched()
     let res = all_tokens_raw(tokenizer);
 
     assert_eq!(Err(MismatchedQuoteCharacters), res);
+}
+
+#[test]
+fn disambiguates_node_test_functions() {
+    // Would prefer parametric tests
+    for name in ["comment", "text", "processing-instruction", "node"].iter() {
+        let input_tokens: Vec<TokenResult> = vec!(
+            Ok(token::String(name.to_string())),
+            Ok(token::LeftParen),
+        );
+
+        let disambig = XPathTokenDisambiguator::new(input_tokens.move_iter());
+
+        assert_eq!(all_tokens(disambig),
+                   vec!(token::NodeTest(name.to_string()),
+                        token::LeftParen));
+    }
+}
+
+#[test]
+fn name_followed_by_left_paren_becomes_function_name() {
+    let input_tokens: Vec<TokenResult> = vec!(
+        Ok(token::String("test".to_string())),
+        Ok(token::LeftParen),
+     );
+
+    let disambig = XPathTokenDisambiguator::new(input_tokens.move_iter());
+
+    assert_eq!(all_tokens(disambig),
+               vec!(token::Function("test".to_string()),
+                    token::LeftParen));
+}
+
+#[test]
+fn name_followed_by_double_colon_becomes_axis_name() {
+    let input_tokens: Vec<TokenResult> = vec!(
+        Ok(token::String("test".to_string())),
+        Ok(token::DoubleColon),
+    );
+
+    let disambig = XPathTokenDisambiguator::new(input_tokens.move_iter());
+
+    assert_eq!(all_tokens(disambig),
+               vec!(token::Axis("test".to_string()),
+                    token::DoubleColon));
+}
+
+#[test]
+fn converts_at_sign_to_attribute_axis() {
+    let input_tokens: Vec<TokenResult> = vec!(Ok(token::AtSign));
+    // let iter: &Iterator<TokenResult> = &input_tokens.move_iter();
+
+    let deabbrv = XPathTokenDeabbreviator::new(input_tokens.move_iter());
+    // let a: () = deabbrv.next();
+    // println!("{}",a );
+
+    assert_eq!(all_tokens(deabbrv), vec!(token::String("attribute".to_string()),
+                                         token::DoubleColon));
+}
+
+#[test]
+fn converts_double_slash_to_descendant_or_self() {
+    let input_tokens: Vec<TokenResult> = vec!(Ok(token::DoubleSlash));
+
+    let deabbrv = XPathTokenDeabbreviator::new(input_tokens.move_iter());
+
+    assert_eq!(all_tokens(deabbrv), vec!(token::Slash,
+                                         token::String("descendant-or-self".to_string()),
+                                         token::DoubleColon,
+                                         token::String("node".to_string()),
+                                         token::LeftParen,
+                                         token::RightParen,
+                                         token::Slash));
+}
+
+#[test]
+fn converts_current_node_to_self_node() {
+    let input_tokens: Vec<TokenResult> = vec!(Ok(token::CurrentNode));
+
+    let deabbrv = XPathTokenDeabbreviator::new(input_tokens.move_iter());
+
+    assert_eq!(all_tokens(deabbrv), vec!(token::String("self".to_string()),
+                                         token::DoubleColon,
+                                         token::String("node".to_string()),
+                                         token::LeftParen,
+                                         token::RightParen));
+}
+
+#[test]
+fn converts_parent_node_to_parent_node() {
+    let input_tokens: Vec<TokenResult> = vec!(Ok(token::ParentNode));
+
+    let deabbrv = XPathTokenDeabbreviator::new(input_tokens.move_iter());
+
+    assert_eq!(all_tokens(deabbrv), vec!(token::String("parent".to_string()),
+                                         token::DoubleColon,
+                                         token::String("node".to_string()),
+                                         token::LeftParen,
+                                         token::RightParen));
 }

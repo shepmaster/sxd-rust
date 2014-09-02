@@ -109,8 +109,6 @@ impl<'a> XPathEvaluationContext<'a> {
 }
 
 pub mod axis;
-pub mod deabbreviator;
-pub mod disambiguator;
 pub mod expression;
 pub mod function;
 pub mod node_test;
