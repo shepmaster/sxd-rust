@@ -10,7 +10,14 @@ pub struct XPathTokenizer {
     prefer_recognition_of_operator_names: bool,
 }
 
-pub type TokenResult = Result<XPathToken, & 'static str>;
+pub type TokenResult = Result<XPathToken, TokenizerErr>;
+
+#[deriving(Show,PartialEq,Clone)]
+pub enum TokenizerErr {
+    MissingLocalName,
+    MismatchedQuoteCharacters,
+    UnableToCreateToken,
+}
 
 struct XPathString {
     xpath: Vec<char>,
@@ -199,7 +206,7 @@ impl XPathTokenizer {
              ("*",   token::Multiply))
     }
 
-    fn tokenize_literal(& mut self, quote_char: char) -> Result<XPathToken, & 'static str> {
+    fn tokenize_literal(& mut self, quote_char: char) -> TokenResult {
         let mut offset = self.start;
 
         offset += 1; // Skip over the starting quote
@@ -209,7 +216,7 @@ impl XPathTokenizer {
         let end_of_string = offset;
 
         if self.xpath.char_at_is_not(offset, quote_char) {
-            return Err("found mismatched quote characters");
+            return Err(MismatchedQuoteCharacters);
         }
         offset += 1; // Skip over ending quote
 
@@ -217,7 +224,7 @@ impl XPathTokenizer {
         return Ok(token::Literal(self.xpath.substr(start_of_string, end_of_string)));
     }
 
-    fn raw_next_token(& mut self) -> Result<XPathToken, & 'static str> {
+    fn raw_next_token(& mut self) -> TokenResult {
         match self.xpath.safe_substr(self.start, self.start + 2) {
             Some(first_two) => {
                 match self.two_char_tokens().find(&first_two) {
@@ -299,7 +306,7 @@ impl XPathTokenizer {
                 offset = self.xpath.while_valid_string(offset);
 
                 if current_start == offset {
-                    return Err("The XPath is missing a local name");
+                    return Err(MissingLocalName);
                 }
 
                 let name = self.xpath.substr(current_start, offset);
@@ -328,7 +335,7 @@ impl XPathTokenizer {
         let token = token.unwrap();
 
         if old_start == self.start {
-            return Err("Unable to create a token");
+            return Err(UnableToCreateToken);
         }
 
         self.consume_whitespace();

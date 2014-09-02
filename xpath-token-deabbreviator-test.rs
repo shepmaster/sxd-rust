@@ -2,10 +2,10 @@ extern crate xpath;
 
 use xpath::token;
 use xpath::token::XPathToken;
-use xpath::tokenizer::TokenResult;
+use xpath::tokenizer::{TokenResult,TokenizerErr};
 use xpath::deabbreviator::XPathTokenDeabbreviator;
 
-fn all_tokens_raw<I: Iterator<TokenResult>>(mut tokenizer: I) -> Result<Vec<XPathToken>, & 'static str> {
+fn all_tokens_raw<I: Iterator<TokenResult>>(mut tokenizer: I) -> Result<Vec<XPathToken>, TokenizerErr> {
     tokenizer.collect()
 }
 

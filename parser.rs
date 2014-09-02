@@ -3,7 +3,7 @@ use std::iter::Peekable;
 use super::{String,Number};
 use super::token;
 use super::token::XPathToken;
-use super::tokenizer::TokenResult;
+use super::tokenizer::{TokenResult,TokenizerErr};
 use super::axis;
 use super::axis::{XPathAxis,SubAxis};
 use super::axis::{
@@ -57,7 +57,7 @@ pub enum ParseErr {
     InvalidXPathAxis(String),
     RanOutOfInput,
     RightHandSideExpressionMissing,
-    TokenizerError(&'static str),
+    TokenizerError(TokenizerErr),
     TrailingSlash,
     UnexpectedToken(token::XPathToken),
 }

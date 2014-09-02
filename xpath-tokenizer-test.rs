@@ -3,12 +3,18 @@ extern crate xpath;
 use xpath::token;
 use xpath::token::XPathToken;
 use xpath::tokenizer::XPathTokenizer;
+use xpath::tokenizer::TokenizerErr;
+use xpath::tokenizer::{
+    MismatchedQuoteCharacters,
+    MissingLocalName,
+    UnableToCreateToken,
+};
 
 fn is_finished(tokenizer: & XPathTokenizer) -> bool {
     ! tokenizer.has_more_tokens()
 }
 
-fn all_tokens_raw(mut tokenizer: XPathTokenizer) -> Result<Vec<XPathToken>, & 'static str> {
+fn all_tokens_raw(mut tokenizer: XPathTokenizer) -> Result<Vec<XPathToken>, TokenizerErr> {
     tokenizer.collect()
 }
 
@@ -358,8 +364,7 @@ fn exception_thrown_when_nothing_was_tokenized()
     let tokenizer = XPathTokenizer::new("!");
     let res = all_tokens_raw(tokenizer);
 
-    assert!(res.is_err());
-    assert!(res.unwrap_err().contains("create a token"));
+    assert_eq!(Err(UnableToCreateToken), res);
 }
 
 #[test]
@@ -368,8 +373,7 @@ fn exception_thrown_when_name_test_has_no_local_name()
     let tokenizer = XPathTokenizer::new("ns:");
     let res = all_tokens_raw(tokenizer);
 
-    assert!(res.is_err());
-    assert!(res.unwrap_err().contains("missing a local name"));
+    assert_eq!(Err(MissingLocalName), res);
 }
 
 #[test]
@@ -378,6 +382,5 @@ fn exception_thrown_when_quote_characters_mismatched()
     let tokenizer = XPathTokenizer::new("'hello\"");
     let res = all_tokens_raw(tokenizer);
 
-    assert!(res.is_err());
-    assert!(res.unwrap_err().contains("mismatched quote characters"));
+    assert_eq!(Err(MismatchedQuoteCharacters), res);
 }
