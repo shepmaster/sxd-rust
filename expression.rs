@@ -198,6 +198,12 @@ pub struct ExpressionPath {
     steps: Vec<SubExpression>,
 }
 
+impl ExpressionPath {
+    pub fn new(start_point: SubExpression, steps: Vec<SubExpression>) -> SubExpression {
+        box ExpressionPath {start_point: start_point, steps: steps}
+    }
+}
+
 impl XPathExpression for ExpressionPath {
     fn evaluate(& self, context: &XPathEvaluationContext) -> XPathValue {
         let mut result = self.start_point.evaluate(context).nodeset();
@@ -222,11 +228,15 @@ impl XPathExpression for ExpressionPath {
 }
 
 pub struct ExpressionPredicate {
-    pub node_selector: SubExpression,
-    pub predicate: SubExpression,
+    node_selector: SubExpression,
+    predicate: SubExpression,
 }
 
 impl ExpressionPredicate {
+    pub fn new(node_selector: SubExpression, predicate: SubExpression) -> SubExpression {
+        box ExpressionPredicate { node_selector: node_selector, predicate: predicate }
+    }
+
     fn include(value: &XPathValue, context: &XPathEvaluationContext) -> bool {
         match value {
             &Number(v) => context.position() == v as uint,
@@ -320,8 +330,8 @@ pub struct ExpressionStep {
 }
 
 impl ExpressionStep {
-    pub fn new(axis: StepAxis, node_test: StepTest) -> ExpressionStep {
-        ExpressionStep {axis: axis, node_test: node_test}
+    pub fn new(axis: StepAxis, node_test: StepTest) -> SubExpression {
+        box ExpressionStep {axis: axis, node_test: node_test}
     }
 }
 

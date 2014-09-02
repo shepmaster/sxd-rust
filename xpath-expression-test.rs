@@ -219,7 +219,7 @@ fn expression_step_numeric_predicate_selects_that_node() {
     let selected_nodes = box ExpressionLiteral{value: Nodes(input_nodeset)};
     let predicate = box ExpressionLiteral{value: Number(1.0)};
 
-    let expr = ExpressionPredicate{node_selector: selected_nodes, predicate: predicate};
+    let expr = ExpressionPredicate::new(selected_nodes, predicate);
 
     let context = setup.context();
     let res = expr.evaluate(&context);
@@ -243,7 +243,7 @@ fn expression_step_false_predicate_selects_no_nodes() {
     let selected_nodes = box ExpressionLiteral{value: Nodes(input_nodeset)};
     let predicate = box ExpressionLiteral{value: Boolean(false)};
 
-    let expr = ExpressionPredicate{node_selector: selected_nodes, predicate: predicate};
+    let expr = ExpressionPredicate::new(selected_nodes, predicate);
 
     let context = setup.context();
     let res = expr.evaluate(&context);

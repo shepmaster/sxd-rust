@@ -4,9 +4,20 @@ use super::{String,Number};
 use super::token;
 use super::token::XPathToken;
 use super::tokenizer::TokenResult;
-use super::expression::XPathExpression;
+use super::axis;
+use super::axis::{XPathAxis,SubAxis};
+use super::axis::{
+    AxisAttribute,
+    AxisChild,
+    AxisDescendant,
+    AxisDescendantOrSelf,
+    AxisParent,
+    AxisSelf,
+};
+use super::expression::SubExpression;
 use super::expression::{
     ExpressionAnd,
+    ExpressionContextNode,
     ExpressionEqual,
     ExpressionFunction,
     ExpressionLiteral,
@@ -14,9 +25,20 @@ use super::expression::{
     ExpressionNegation,
     ExpressionNotEqual,
     ExpressionOr,
+    ExpressionPath,
+    ExpressionPredicate,
     ExpressionRelational,
+    ExpressionRootNode,
+    ExpressionStep,
     ExpressionUnion,
     ExpressionVariable,
+};
+use super::node_test::SubNodeTest;
+use super::node_test::{
+    NodeTestAttribute,
+    NodeTestElement,
+    NodeTestNode,
+    NodeTestText,
 };
 
 pub struct XPathParser;
@@ -27,15 +49,17 @@ impl XPathParser {
     }
 }
 
-pub type SubExpression = Box<XPathExpression + 'static>;
-
 #[deriving(Show,PartialEq,Clone)]
 pub enum ParseErr {
-    RanOutOfInput,
-    UnexpectedToken(token::XPathToken),
-    RightHandSideExpressionMissing,
+    EmptyPredicate,
     ExtraUnparsedTokens,
+    InvalidNodeTest(String),
+    InvalidXPathAxis(String),
+    RanOutOfInput,
+    RightHandSideExpressionMissing,
     TokenizerError(&'static str),
+    TrailingSlash,
+    UnexpectedToken(token::XPathToken),
 }
 
 pub type ParseResult = Result<Option<SubExpression>, ParseErr>;
@@ -85,6 +109,30 @@ impl<I: Iterator<TokenResult>> XCompat for Peekable<TokenResult, I> {
     }
 }
 
+/// Similar to `consume`, but can be used when the token carries a
+/// single value.
+macro_rules! consume_value(
+    ($source:expr, token::$token:ident) => (
+        match $source.next() {
+            None => return Err(RanOutOfInput),
+            Some(Err(x)) => return Err(TokenizerError(x)),
+            Some(Ok(token::$token(x))) => x,
+            Some(Ok(x)) => return Err(UnexpectedToken(x)),
+        }
+    );
+)
+
+/// Similar to `next_token_is`, but can be used when the token carries
+/// a single value
+macro_rules! next_token_is(
+    ($source:expr, token::$token:ident) => (
+        match $source.peek() {
+            Some(&Ok(token::$token(_))) => true,
+            _ => false,
+        }
+    );
+)
+
 impl<I : Iterator<TokenResult>> LeftAssociativeBinaryParser<I> {
     fn new(rules: Vec<BinaryRule>) -> LeftAssociativeBinaryParser<I> {
         LeftAssociativeBinaryParser {
@@ -92,7 +140,10 @@ impl<I : Iterator<TokenResult>> LeftAssociativeBinaryParser<I> {
         }
     }
 
-    fn parse(&self, source: TokenSource<I>, child_parse: |TokenSource<I>| -> ParseResult) -> ParseResult {
+    fn parse(&self,
+             source: TokenSource<I>,
+             child_parse: |TokenSource<I>| -> ParseResult)
+             -> ParseResult {
         let left = try!(child_parse(source));
 
         let mut left = match left {
@@ -128,104 +179,75 @@ impl<I : Iterator<TokenResult>> LeftAssociativeBinaryParser<I> {
     }
 }
 
-// std::unique_ptr<XPathExpression>
-// parse_children_in_order(std::vector<ParseFn> child_parses, XPathParserTokenSource &source)
-// {
-//   for (auto child_parse : child_parses) {
-//     auto expr = child_parse(source);
-//     if (expr) return expr;
-//   }
-
-//   return nullptr;
-// }
-
-// std::unique_ptr<XPathAxis>
-// parse_axis(XPathParserTokenSource &source) {
-//   if (source.next_token_is(token::Axis)) {
-//     auto token = source.next_token();
-//     auto name = token.string();
-//     source.consume(token::DoubleColon);
-
-//     if (name == "self") {
-//       return make_unique<AxisSelf>();
-//     } else if (name == "parent") {
-//       return make_unique<AxisParent>();
-//     } else if (name == "descendant") {
-//       return make_unique<AxisDescendant>();
-//     } else if (name == "descendant-or-self") {
-//       return make_unique<AxisDescendantOrSelf>();
-//     } else if (name == "attribute") {
-//       return make_unique<AxisAttribute>();
-//     } else {
-//       throw InvalidXPathAxisException(name);
-//     }
-//   }
-
-//   return make_unique<AxisChild>();
-// }
-
-// std::unique_ptr<XPathNodeTest>
-// parse_node_test(XPathParserTokenSource &source) {
-//   if (source.next_token_is(token::NodeTest)) {
-//     auto token = source.next_token();
-//     auto name = token.string();
-
-//     source.consume(token::LeftParen);
-//     source.consume(token::RightParen);
-
-//     if (name == "node") {
-//       return make_unique<NodeTestNode>();
-//     } else if (name == "text") {
-//       return make_unique<NodeTestText>();
-//     } else {
-//       throw InvalidNodeTestException(name);
-//     }
-//   }
-
-//   return nullptr;
-// }
-
-// std::unique_ptr<XPathNodeTest>
-// default_node_test(XPathParserTokenSource &source, std::unique_ptr<XPathAxis> &axis) {
-//   if (source.next_token_is(token::String)) {
-//     auto token = source.next_token();
-
-//     switch (axis->principal_node_type()) {
-//     case PrincipalNodeType::Attribute:
-//       return make_unique<NodeTestAttribute>(token.string());
-//     case PrincipalNodeType::Element:
-//       return make_unique<NodeTestElement>(token.prefixed_name());
-//     }
-//   }
-
-//   return nullptr;
-// }
-
-/// Similar to `consume`, but can be used when the token carries a
-/// single value.
-macro_rules! consume_value(
-    ($source:expr, token::$token:ident) => (
-        match $source.next() {
-            None => return Err(RanOutOfInput),
-            Some(Err(x)) => return Err(TokenizerError(x)),
-            Some(Ok(token::$token(x))) => x,
-            Some(Ok(x)) => return Err(UnexpectedToken(x)),
+fn first_matching_rule
+    <I : Iterator<TokenResult>>
+    (child_parses: &mut Vec<|TokenSource<I>| -> ParseResult>,
+     source: TokenSource<I>)
+     -> ParseResult
+{
+    for child_parse in child_parses.mut_iter() {
+        let expr = try!((*child_parse)(source));
+        if expr.is_some() {
+            return Ok(expr);
         }
-    );
-)
+    }
 
-/// Similar to `next_token_is`, but can be used when the token carries
-/// a single value
-macro_rules! next_token_is(
-    ($source:expr, token::$token:ident) => (
-        match $source.peek() {
-            Some(&Ok(token::$token(_))) => true,
-            _ => false,
-        }
-    );
-)
+    Ok(None)
+}
 
 impl<I : Iterator<TokenResult>> XPathParser {
+
+    fn parse_axis(&self, source: TokenSource<I>) -> Result<SubAxis, ParseErr> {
+        if next_token_is!(source, token::Axis) {
+            let name = consume_value!(source, token::Axis);
+            try!(source.consume(&token::DoubleColon));
+
+            match name.as_slice() {
+                // TODO: explicit child axis?
+                "self" => Ok(box AxisSelf as SubAxis),
+                "parent" => Ok(box AxisParent as SubAxis),
+                "descendant" => Ok(box AxisDescendant as SubAxis),
+                "descendant-or-self" => Ok(AxisDescendantOrSelf::new()),
+                "attribute" => Ok(box AxisAttribute as SubAxis),
+                _ => Err(InvalidXPathAxis(name)),
+            }
+        } else {
+            Ok(box AxisChild as SubAxis)
+        }
+    }
+
+    fn parse_node_test(&self, source: TokenSource<I>) -> Result<Option<SubNodeTest>, ParseErr> {
+        if next_token_is!(source, token::NodeTest) {
+            let name = consume_value!(source, token::NodeTest);
+
+            try!(source.consume(&token::LeftParen));
+            try!(source.consume(&token::RightParen));
+
+            match name.as_slice() {
+                // TODO: explicit element, attribute tests?
+                "node" => Ok(Some(box NodeTestNode as SubNodeTest)),
+                "text" => Ok(Some(box NodeTestText as SubNodeTest)),
+                _ => Err(InvalidNodeTest(name))
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn default_node_test(&self, source: TokenSource<I>, axis: &XPathAxis)
+                         -> Result<Option<SubNodeTest>,ParseErr>
+    {
+        if next_token_is!(source, token::String) {
+            let name = consume_value!(source, token::String);
+
+            match axis.principal_node_type() {
+                axis::Attribute => Ok(Some(box NodeTestAttribute{name: name} as SubNodeTest)),
+                axis::Element => Ok(Some(box NodeTestElement{name: name} as SubNodeTest)),
+            }
+        } else {
+            Ok(None)
+        }
+    }
 
     fn parse_variable_reference(&self, source: TokenSource<I>) -> ParseResult {
         if source.next_token_is(&token::DollarSign) {
@@ -286,167 +308,143 @@ impl<I : Iterator<TokenResult>> XPathParser {
             |src: TokenSource<I>| self.parse_function_call(src),
         ];
 
-        // TODO: parse_children_in_order
-        for child_parse in child_parses.mut_iter() {
-            let expr = try!((*child_parse)(source));
-            if expr.is_some() {
-                return Ok(expr);
+        first_matching_rule(&mut child_parses, source)
+    }
+
+    fn parse_predicate_expression(&self, source: TokenSource<I>) -> ParseResult {
+        if source.next_token_is(&token::LeftBracket) {
+            try!(source.consume(&token::LeftBracket));
+
+            // TODO: This should be the top-level expression
+            match try!(self.parse_primary_expression(source)) {
+                Some(predicate) => {
+                    try!(source.consume(&token::RightBracket));
+                    Ok(Some(predicate))
+                },
+                None => Err(EmptyPredicate),
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn parse_step(&self, source: TokenSource<I>) -> ParseResult {
+        let axis = try!(self.parse_axis(source));
+
+        let node_test = match try!(self.parse_node_test(source)) {
+            Some(test) => Some(test),
+            None => try!(self.default_node_test(source, axis)),
+        };
+
+        match node_test {
+            Some(test) => Ok(Some(ExpressionStep::new(axis, test))),
+            None => Ok(None)
+        }
+    }
+
+    fn parse_and_add_predicates(&self,
+                                source: TokenSource<I>,
+                                node_selecting_expr: SubExpression)
+                                -> Result<SubExpression,ParseErr>
+    {
+        let mut predicates = Vec::new();
+
+        loop {
+            match try!(self.parse_predicate_expression(source)) {
+                Some(predicate) => predicates.push(predicate),
+                None => break,
             }
         }
 
-        Ok(None)
+        let wrap = |expr, pred| ExpressionPredicate::new(expr, pred);
+        Ok(predicates.move_iter().fold(node_selecting_expr, wrap))
     }
 
-}
+    fn parse_relative_location_path_raw(&self,
+                                        source: TokenSource<I>,
+                                        start_point: SubExpression) -> ParseResult
+    {
+        match try!(self.parse_step(source)) {
+            Some(step) => {
+                let mut steps = Vec::new();
 
-// std::unique_ptr<XPathExpression>
-// parse_predicate_expression(XPathParserTokenSource &source)
-// {
-//   if (source.next_token_is(token::LeftBracket)) {
-//     source.consume(token::LeftBracket);
+                let step = try!(self.parse_and_add_predicates(source, step));
+                steps.push(step);
 
-//     // TODO: This should be the top-level expression
-//     auto predicate = parse_primary_expression(source);
-//     if (! predicate) {
-//       throw EmptyPredicateException();
-//     }
+                while source.next_token_is(&token::Slash) {
+                    try!(source.consume(&token::Slash));
 
-//     source.consume(token::RightBracket);
+                    match try!(self.parse_step(source)) {
+                        Some(next) => {
+                            let next = try!(self.parse_and_add_predicates(source, next));
+                            steps.push(next);
+                        },
+                        None => return Err(TrailingSlash),
+                    }
+                }
 
-//     return predicate;
-//   }
+                Ok(Some(ExpressionPath::new(start_point, steps)))
+            },
+            None => Ok(None),
+        }
+    }
 
-//   return nullptr;
-// }
+    fn parse_relative_location_path(&self, source: TokenSource<I>) -> ParseResult {
+        let start_point = box ExpressionContextNode;
+        self.parse_relative_location_path_raw(source, start_point)
+    }
 
-// std::unique_ptr<XPathExpression>
-// parse_step(XPathParserTokenSource &source)
-// {
-//   auto axis = parse_axis(source);
+    fn parse_absolute_location_path(&self, source: TokenSource<I>) -> ParseResult {
+        if source.next_token_is(&token::Slash) {
+            try!(source.consume(&token::Slash));
 
-//   auto node_test = parse_node_test(source);
-//   if (! node_test) {
-//     node_test = default_node_test(source, axis);
-//   }
-//   if (! node_test) {
-//     return nullptr;
-//   }
+            let start_point = box ExpressionRootNode;
+            match try!(self.parse_relative_location_path_raw(source, start_point)) {
+                Some(expr) => Ok(Some(expr)),
+                None => Ok(Some(box ExpressionRootNode as SubExpression)),
+            }
+        } else {
+            Ok(None)
+        }
+    }
 
-//   return make_unique<ExpressionStep>(move(axis), move(node_test));
-// }
+    fn parse_location_path(&self, source: TokenSource<I>) -> ParseResult {
+        let mut child_parses = vec![
+            |source: TokenSource<I>| self.parse_relative_location_path(source),
+            |source: TokenSource<I>| self.parse_absolute_location_path(source),
+        ];
 
-// std::unique_ptr<XPathExpression>
-// parse_predicates(XPathParserTokenSource &source,
-//                  std::unique_ptr<XPathExpression> node_selecting_expr)
-// {
-//   while (auto predicate_expr = parse_predicate_expression(source)) {
-//     node_selecting_expr = make_unique<ExpressionPredicate>(move(node_selecting_expr),
-//                                                            move(predicate_expr));
-//   }
+        first_matching_rule(&mut child_parses, source)
+    }
 
-//   return node_selecting_expr;
-// }
+    fn parse_filter_expression(&self, source: TokenSource<I>) -> ParseResult {
+        match try!(self.parse_primary_expression(source)) {
+            Some(expr) => Ok(Some(try!(self.parse_and_add_predicates(source, expr)))),
+            None => Ok(None),
+        }
+    }
 
-// std::unique_ptr<XPathExpression>
-// parse_relative_location_path_raw(XPathParserTokenSource &source,
-//                                  std::unique_ptr<XPathExpression> start_point)
-// {
-//   std::vector<std::unique_ptr<XPathExpression>> steps;
+    fn parse_path_expression(&self, source: TokenSource<I>) -> ParseResult {
+        let expr = try!(self.parse_location_path(source));
+        if expr.is_some() {
+            return Ok(expr);
+        } // TODO: investigate if this is a pattern
 
-//   auto step = parse_step(source);
-//   if (step) {
-//     step = parse_predicates(source, move(step));
-//     steps.push_back(move(step));
+        match try!(self.parse_filter_expression(source)) {
+            Some(expr) =>
+                if source.next_token_is(&token::Slash) {
+                    try!(source.consume(&token::Slash));
 
-//     while (source.next_token_is(token::Slash)) {
-//       source.consume(token::Slash);
-
-//       auto next = parse_step(source);
-//       if (! next) {
-//         throw TrailingSlashException();
-//       }
-
-//       next = parse_predicates(source, move(next));
-//       steps.push_back(move(next));
-//     }
-
-//     return make_unique<ExpressionPath>(move(start_point), move(steps));
-//   }
-
-//   return nullptr;
-// }
-
-// std::unique_ptr<XPathExpression>
-// parse_relative_location_path(XPathParserTokenSource &source)
-// {
-//   auto start_point = make_unique<ExpressionContextNode>();
-//   return parse_relative_location_path_raw(source, move(start_point));
-// }
-
-// std::unique_ptr<XPathExpression>
-// parse_absolute_location_path(XPathParserTokenSource &source)
-// {
-//   if (source.next_token_is(token::Slash)) {
-//     source.consume(token::Slash);
-
-//     auto start_point = make_unique<ExpressionRootNode>();
-//     auto expr = parse_relative_location_path_raw(source, move(start_point));
-//     if (expr) return expr;
-
-//     return make_unique<ExpressionRootNode>();
-//   }
-
-//   return nullptr;
-// }
-
-// std::unique_ptr<XPathExpression>
-// parse_location_path(XPathParserTokenSource &source)
-// {
-//   std::vector<ParseFn> child_parses = {
-//     parse_relative_location_path,
-//     parse_absolute_location_path
-//   };
-
-//   return parse_children_in_order(child_parses, source);
-// }
-
-// std::unique_ptr<XPathExpression>
-// parse_filter_expression(XPathParserTokenSource &source)
-// {
-//   auto expr = parse_primary_expression(source);
-//   if (expr) {
-//     return parse_predicates(source, move(expr));
-//   }
-
-//   return nullptr;
-// }
-
-// std::unique_ptr<XPathExpression>
-// parse_path_expression(XPathParserTokenSource &source)
-// {
-//   auto expr = parse_location_path(source);
-//   if (expr) return expr;
-
-//   auto filter = parse_filter_expression(source);
-//   if (filter) {
-//     if (source.next_token_is(token::Slash)) {
-//       source.consume(token::Slash);
-
-//       filter = parse_relative_location_path_raw(source, move(filter));
-//       if (! filter) {
-//         throw TrailingSlashException();
-//       }
-
-//       return filter;
-//     }
-
-//     return filter;
-//   }
-
-//   return nullptr;
-// }
-
-impl<I : Iterator<TokenResult>> XPathParser {
+                    match try!(self.parse_relative_location_path_raw(source, expr)) {
+                        Some(expr) => Ok(Some(expr)),
+                        None => Err(TrailingSlash),
+                    }
+                } else {
+                    Ok(Some(expr))
+                },
+            None => Ok(None),
+        }
+    }
 
     fn parse_union_expression(&self, source: TokenSource<I>) -> ParseResult {
         let rules = vec![
@@ -454,8 +452,7 @@ impl<I : Iterator<TokenResult>> XPathParser {
         ];
 
         let parser = LeftAssociativeBinaryParser::new(rules);
-        // TODO: parse_path_expression
-        parser.parse(source, |source| self.parse_primary_expression(source))
+        parser.parse(source, |source| self.parse_path_expression(source))
     }
 
     fn parse_unary_expression(&self, source: TokenSource<I>) -> ParseResult {
@@ -504,10 +501,14 @@ impl<I : Iterator<TokenResult>> XPathParser {
 
     fn parse_relational_expression(&self, source: TokenSource<I>) -> ParseResult {
         let rules = vec![
-            BinaryRule { token: token::LessThan,           builder: ExpressionRelational::less_than },
-            BinaryRule { token: token::LessThanOrEqual,    builder: ExpressionRelational::less_than_or_equal },
-            BinaryRule { token: token::GreaterThan,        builder: ExpressionRelational::greater_than },
-            BinaryRule { token: token::GreaterThanOrEqual, builder: ExpressionRelational::greater_than_or_equal },
+            BinaryRule { token: token::LessThan,
+                         builder: ExpressionRelational::less_than },
+            BinaryRule { token: token::LessThanOrEqual,
+                         builder: ExpressionRelational::less_than_or_equal },
+            BinaryRule { token: token::GreaterThan,
+                         builder: ExpressionRelational::greater_than },
+            BinaryRule { token: token::GreaterThanOrEqual,
+                         builder: ExpressionRelational::greater_than_or_equal },
         ];
 
         let parser = LeftAssociativeBinaryParser::new(rules);

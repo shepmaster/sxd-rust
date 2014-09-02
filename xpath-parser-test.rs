@@ -7,17 +7,27 @@ extern crate xpath;
 
 use std::collections::hashmap::HashMap;
 
-use document::{Document,Element,ToAny};
+use document::{Document,Element,Attribute,Text,ToAny};
 
 use xpath::{Boolean,Number,String,Nodes};
-use xpath::token;
-use xpath::tokenizer::TokenResult;
 use xpath::{Functions,Variables};
 use xpath::{XPathValue,XPathEvaluationContext};
-use xpath::expression::XPathExpression;
-use xpath::parser::XPathParser;
+
+use xpath::token;
+use xpath::tokenizer::TokenResult;
+
+use xpath::expression::{XPathExpression,SubExpression};
+
+use xpath::parser::{XPathParser,ParseResult};
 use xpath::parser::{
+    EmptyPredicate,
+    ExtraUnparsedTokens,
+    InvalidNodeTest,
+    InvalidXPathAxis,
+    RanOutOfInput,
     RightHandSideExpressionMissing,
+    TokenizerError,
+    TrailingSlash,
     UnexpectedToken,
 };
 
@@ -58,27 +68,6 @@ macro_rules! assert_approx_eq(
     })
 )
 
-// class XPathParserTest : public ::testing::Test {
-// protected:
-//   TokenProvider tokens;
-
-//   NullNamespaceResolver null_namespaces;
-
-//   void SetUp() {
-//     XPathCoreFunctionLibrary::register_functions(functions);
-//   }
-
-//   Attribute *add_attribute(Element *element, std::string name, std::string value) {
-//     return element->set_attribute(name, value);
-//   }
-
-//   TextNode *add_text_node(Element *parent, std::string value) {
-//     auto tn = doc.new_text_node(value);
-//     parent->append_child(tn);
-//     return tn;
-//   }
-// };
-
 struct Setup {
     doc: Document,
     top_node: Element,
@@ -109,302 +98,328 @@ impl Setup {
         let n = self.doc.new_element(name.to_string());
         parent.append_child(n.clone());
         n
-  }
+    }
+
+    fn add_attribute(&self, element: Element, name: &str, value: &str) -> Attribute {
+        element.set_attribute(name.to_string(), value.to_string())
+    }
+
+    fn add_text(&self, parent: Element, value: &str) -> Text {
+        let tn = self.doc.new_text(value.to_string());
+        parent.append_child(tn.clone());
+        tn
+    }
+
+    fn add_var(&mut self, name: &str, value: XPathValue) {
+        self.variables.insert(name.to_string(), value);
+    }
+
+    fn parse_raw(&self, tokens: Vec<TokenResult>) -> ParseResult {
+        self.parser.parse(tokens.move_iter())
+    }
+
+    fn parse(&self, tokens: Vec<TokenResult>) -> SubExpression {
+        self.parse_raw(tokens).unwrap().unwrap()
+    }
 
     fn evaluate(&self, expr: &XPathExpression) -> XPathValue {
-        let mut context = XPathEvaluationContext::new(self.top_node.to_any(), &self.functions, &self.variables);
-        context.next(self.top_node.to_any());
+        self.evaluate_on(expr, self.top_node.clone())
+    }
+
+    fn evaluate_on<A : ToAny>(&self, expr: &XPathExpression, node: A) -> XPathValue {
+        let mut context = XPathEvaluationContext::new(node.to_any(),
+                                                      &self.functions,
+                                                      &self.variables);
+        context.next(node.to_any());
         expr.evaluate(&context)
     }
 }
 
-// #[test]
-// fn parses_string_as_child)
-// {
-//   tokens.add(token::String("hello"));
+#[test]
+fn parses_string_as_child() {
+    let setup = Setup::new();
+    let tokens = tokens![token::String("hello".to_string())];
 
-//   auto expr = parser->parse();
+    let expr = setup.parse(tokens);
 
-//   auto hello = add_child(top_node, "hello");
+    let hello = setup.add_child(&setup.top_node, "hello");
 
-//   ASSERT_THAT(evaluate_on(expr, top_node).nodeset(), ElementsAre(hello));
-// }
+    assert_eq!(Nodes(nodeset![hello]), setup.evaluate_on(expr, setup.top_node.clone()));
+}
 
-// #[test]
-// fn parses_two_strings_as_grandchild)
-// {
-//   tokens.add({
-//       token::String("hello"),
-//       token::Slash,
-//       token::String("world")
-//   });
+#[test]
+fn parses_two_strings_as_grandchild() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::String("hello".to_string()),
+        token::Slash,
+        token::String("world".to_string())
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parse(tokens);
 
-//   auto hello = add_child(top_node, "hello");
-//   auto world = add_child(hello, "world");
+    let hello = setup.add_child(&setup.top_node, "hello");
+    let world = setup.add_child(&hello, "world");
 
-//   ASSERT_THAT(evaluate_on(expr, top_node).nodeset(), ElementsAre(world));
-// }
+    assert_eq!(Nodes(nodeset![world]), setup.evaluate_on(expr, setup.top_node.clone()));
+}
 
-// #[test]
-// fn parses_self_axis)
-// {
-//   tokens.add({
-//       token::Axis, "self",
-//       token::DoubleColon,
-//       token::String("top-node")
-//   });
+#[test]
+fn parses_self_axis() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::Axis("self".to_string()),
+        token::DoubleColon,
+        token::String("the-top-node".to_string())
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parse(tokens);
 
-//   ASSERT_THAT(evaluate_on(expr, top_node).nodeset(), ElementsAre(top_node));
-// }
+    assert_eq!(Nodes(nodeset![setup.top_node.clone()]), setup.evaluate_on(expr, setup.top_node.clone()));
+}
 
-// #[test]
-// fn parses_parent_axis)
-// {
-//   tokens.add({
-//       token::Axis, "parent",
-//       token::DoubleColon,
-//       token::String("top-node")
-//   });
+#[test]
+fn parses_parent_axis() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::Axis("parent".to_string()),
+        token::DoubleColon,
+        token::String("the-top-node".to_string())
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parse(tokens);
 
-//   auto hello = add_child(top_node, "hello");
-//   ASSERT_THAT(evaluate_on(expr, hello).nodeset(), ElementsAre(top_node));
-// }
+    let hello = setup.add_child(&setup.top_node, "hello");
+    assert_eq!(Nodes(nodeset![setup.top_node.clone()]), setup.evaluate_on(expr, hello));
+}
 
-// #[test]
-// fn parses_descendant_axis)
-// {
-//   tokens.add({
-//       token::Axis, "descendant",
-//       token::DoubleColon,
-//       token::String("two")
-//   });
+#[test]
+fn parses_descendant_axis() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::Axis("descendant".to_string()),
+        token::DoubleColon,
+        token::String("two".to_string())
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parse(tokens);
 
-//   auto one = add_child(top_node, "one");
-//   auto two = add_child(one, "two");
+    let one = setup.add_child(&setup.top_node, "one");
+    let two = setup.add_child(&one, "two");
 
-//   ASSERT_THAT(evaluate_on(expr, top_node).nodeset(), ElementsAre(two));
-// }
+    assert_eq!(Nodes(nodeset![two]), setup.evaluate_on(expr, setup.top_node.clone()));
+}
 
-// #[test]
-// fn parses_descendant_or_self_axis)
-// {
-//   tokens.add({
-//       token::Axis, "descendant-or-self",
-//       token::DoubleColon,
-//       token::String("*")
-//   });
+#[test]
+fn parses_descendant_or_self_axis() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::Axis("descendant-or-self".to_string()),
+        token::DoubleColon,
+        token::String("*".to_string())
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parse(tokens);
 
-//   auto one = add_child(top_node, "one");
-//   auto two = add_child(one, "two");
+    let one = setup.add_child(&setup.top_node, "one");
+    let two = setup.add_child(&one, "two");
 
-//   ASSERT_THAT(evaluate_on(expr, one).nodeset(), ElementsAre(one, two));
-// }
+    assert_eq!(Nodes(nodeset![one.clone(), two]), setup.evaluate_on(expr, one));
+}
 
-// #[test]
-// fn parses_attribute_axis)
-// {
-//   tokens.add({
-//       token::Axis, "attribute",
-//       token::DoubleColon,
-//       token::String("*")
-//   });
+#[test]
+fn parses_attribute_axis() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::Axis("attribute".to_string()),
+        token::DoubleColon,
+        token::String("*".to_string())
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parse(tokens);
 
-//   auto one = add_child(top_node, "one");
-//   auto attr = add_attribute(one, "hello", "world");
+    let one = setup.add_child(&setup.top_node, "one");
+    let attr = setup.add_attribute(one.clone(), "hello", "world");
 
-//   ASSERT_THAT(evaluate_on(expr, one).nodeset(), ElementsAre(attr));
-// }
+    assert_eq!(Nodes(nodeset![attr]), setup.evaluate_on(expr, one));
+}
 
-// #[test]
-// fn parses_child_with_same_name_as_an_axis)
-// {
-//   tokens.add(token::String("self"));
+#[test]
+fn parses_child_with_same_name_as_an_axis() {
+    let setup = Setup::new();
+    let tokens = tokens![token::String("self".to_string())];
 
-//   auto expr = parser->parse();
+    let expr = setup.parse(tokens);
 
-//   auto self = add_child(top_node, "self");
-//   ASSERT_THAT(evaluate_on(expr, top_node).nodeset(), ElementsAre(self));
-// }
+    let element = setup.add_child(&setup.top_node, "self");
+    assert_eq!(Nodes(nodeset![element]), setup.evaluate_on(expr, setup.top_node.clone()));
+}
 
-// #[test]
-// fn parses_node_node_test)
-// {
-//   tokens.add({
-//       token::NodeTest, "node",
-//       token::LeftParen,
-//       token::RightParen
-//   });
+#[test]
+fn parses_node_node_test() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::NodeTest("node".to_string()),
+        token::LeftParen,
+        token::RightParen
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parse(tokens);
 
-//   auto one = add_child(top_node, "one");
-//   auto two = add_child(one, "two");
+    let one = setup.add_child(&setup.top_node, "one");
+    let two = setup.add_child(&one, "two");
 
-//   ASSERT_THAT(evaluate_on(expr, one).nodeset(), ElementsAre(two));
-// }
+    assert_eq!(Nodes(nodeset![two]), setup.evaluate_on(expr, one));
+}
 
-// #[test]
-// fn parses_text_node_test)
-// {
-//   tokens.add({
-//       token::NodeTest, "text",
-//       token::LeftParen,
-//       token::RightParen
-//   });
+#[test]
+fn parses_text_node_test() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::NodeTest("text".to_string()),
+        token::LeftParen,
+        token::RightParen
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parse(tokens);
 
-//   auto one = add_child(top_node, "one");
-//   auto text = add_text_node(one, "text");
+    let one = setup.add_child(&setup.top_node, "one");
+    let text = setup.add_text(one.clone(), "text");
 
-//   ASSERT_THAT(evaluate_on(expr, one).nodeset(), ElementsAre(text));
-// }
+    assert_eq!(Nodes(nodeset![text]), setup.evaluate_on(expr, one));
+}
 
-// #[test]
-// fn parses_axis_and_node_test)
-// {
-//   tokens.add({
-//       token::Axis, "self",
-//       token::DoubleColon,
-//       token::NodeTest, "text",
-//       token::LeftParen,
-//       token::RightParen
-//   });
+#[test]
+fn parses_axis_and_node_test() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::Axis("self".to_string()),
+        token::DoubleColon,
+        token::NodeTest("text".to_string()),
+        token::LeftParen,
+        token::RightParen
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parse(tokens);
 
-//   auto one = add_child(top_node, "one");
-//   auto text = add_text_node(one, "text");
+    let one = setup.add_child(&setup.top_node, "one");
+    let text = setup.add_text(one, "text");
 
-//   ASSERT_THAT(evaluate_on(expr, text).nodeset(), ElementsAre(text));
-// }
+    assert_eq!(Nodes(nodeset![text.clone()]), setup.evaluate_on(expr, text));
+}
 
-// #[test]
-// fn numeric_predicate_selects_indexed_node)
-// {
-//   tokens.add({
-//       token::String("*"),
-//       token::LeftBracket,
-//       token::Number(2),
-//       token::RightBracket
-//   });
+#[test]
+fn numeric_predicate_selects_indexed_node() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::String("*".to_string()),
+        token::LeftBracket,
+        token::Number(2.0),
+        token::RightBracket
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parse(tokens);
 
-//   add_child(top_node, "first");
-//   auto second = add_child(top_node, "second");
+    setup.add_child(&setup.top_node, "first");
+    let second = setup.add_child(&setup.top_node, "second");
 
-//   ASSERT_THAT(evaluate_on(expr, top_node).nodeset(), ElementsAre(second));
-// }
+    assert_eq!(Nodes(nodeset![second]), setup.evaluate_on(expr, setup.top_node.clone()));
+}
 
 #[test]
 fn string_literal() {
     let setup = Setup::new();
     let tokens = tokens![token::Literal("string".to_string())];
 
-    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parse(tokens);
 
     assert_eq!(String("string".to_string()), setup.evaluate(expr));
 }
 
-// #[test]
-// fn true_function_predicate_selects_all_nodes)
-// {
-//   tokens.add({
-//       token::String("*"),
-//       token::LeftBracket,
-//       token::Function, "true",
-//       token::LeftParen,
-//       token::RightParen,
-//       token::RightBracket
-//   });
+#[test]
+fn true_function_predicate_selects_all_nodes() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::String("*".to_string()),
+        token::LeftBracket,
+        token::Function("true".to_string()),
+        token::LeftParen,
+        token::RightParen,
+        token::RightBracket
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parse(tokens);
 
-//   auto first = add_child(top_node, "first");
-//   auto second = add_child(top_node, "second");
+    let first = setup.add_child(&setup.top_node, "first");
+    let second = setup.add_child(&setup.top_node, "second");
 
-//   ASSERT_THAT(evaluate_on(expr, top_node).nodeset(), ElementsAre(first, second));
-// }
+    assert_eq!(Nodes(nodeset![first, second]), setup.evaluate_on(expr, setup.top_node.clone()));
+}
 
-// #[test]
-// fn false_function_predicate_selects_no_nodes)
-// {
-//   tokens.add({
-//       token::String("*"),
-//       token::LeftBracket,
-//       token::Function, "false",
-//       token::LeftParen,
-//       token::RightParen,
-//       token::RightBracket
-//   });
+#[test]
+fn false_function_predicate_selects_no_nodes() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::String("*".to_string()),
+        token::LeftBracket,
+        token::Function("false".to_string()),
+        token::LeftParen,
+        token::RightParen,
+        token::RightBracket
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parse(tokens);
 
-//   add_child(top_node, "first");
-//   add_child(top_node, "second");
+    setup.add_child(&setup.top_node, "first");
+    setup.add_child(&setup.top_node, "second");
 
-//   ASSERT_THAT(evaluate_on(expr, top_node).nodeset(), ElementsAre());
-// }
+    assert_eq!(Nodes(nodeset![]), setup.evaluate_on(expr, setup.top_node.clone()));
+}
 
-// #[test]
-// fn multiple_predicates)
-// {
-//   tokens.add({
-//       token::String("*"),
-//       token::LeftBracket,
-//       token::Number(2.0),
-//       token::RightBracket,
-//       token::LeftBracket,
-//       token::Number(1.0),
-//       token::RightBracket
-//   });
+#[test]
+fn multiple_predicates() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::String("*".to_string()),
+        token::LeftBracket,
+        token::Number(2.0),
+        token::RightBracket,
+        token::LeftBracket,
+        token::Number(1.0),
+        token::RightBracket
+    ];
 
-//   auto expr = parser->parse();
+    let expr = setup.parse(tokens);
 
-//   add_child(top_node, "first");
-//   auto second = add_child(top_node, "second");
+    setup.add_child(&setup.top_node, "first");
+    let second = setup.add_child(&setup.top_node, "second");
 
-//   ASSERT_THAT(evaluate_on(expr, top_node).nodeset(), ElementsAre(second));
-// }
+    assert_eq!(Nodes(nodeset![second]), setup.evaluate_on(expr, setup.top_node.clone()));
+}
 
 #[test]
 fn functions_accept_arguments() {
     let setup = Setup::new();
     let tokens = tokens![
-      token::Function("not".to_string()),
-      token::LeftParen,
-      token::Function("true".to_string()),
-      token::LeftParen,
-      token::RightParen,
-      token::RightParen,
-  ];
+        token::Function("not".to_string()),
+        token::LeftParen,
+        token::Function("true".to_string()),
+        token::LeftParen,
+        token::RightParen,
+        token::RightParen,
+    ];
 
-  let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parse(tokens);
 
-  assert_eq!(Boolean(false), setup.evaluate(expr));
+    assert_eq!(Boolean(false), setup.evaluate(expr));
 }
 
 #[test]
 fn numeric_literal() {
     let setup = Setup::new();
-    let tokens = tokens![
-        token::Number(3.2),
-    ];
+    let tokens = tokens![token::Number(3.2)];
 
-    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parse(tokens);
 
     assert_approx_eq!(Number(3.2), setup.evaluate(expr));
 }
@@ -418,7 +433,7 @@ fn addition_of_two_numbers() {
         token::Number(2.2)
     ];
 
-    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parse(tokens);
 
     assert_approx_eq!(Number(3.3), setup.evaluate(expr));
 }
@@ -434,7 +449,7 @@ fn addition_of_multiple_numbers() {
         token::Number(3.3)
     ];
 
-    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parse(tokens);
 
     assert_approx_eq!(Number(6.6), setup.evaluate(expr));
 }
@@ -448,7 +463,7 @@ fn subtraction_of_two_numbers() {
         token::Number(2.2),
     ];
 
-    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parse(tokens);
 
     assert_approx_eq!(Number(-1.1), setup.evaluate(expr));
 }
@@ -464,7 +479,7 @@ fn additive_expression_is_left_associative() {
         token::Number(3.3),
     ];
 
-    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parse(tokens);
 
     assert_approx_eq!(Number(-4.4), setup.evaluate(expr));
 }
@@ -478,7 +493,7 @@ fn multiplication_of_two_numbers() {
         token::Number(2.2),
     ];
 
-    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parse(tokens);
 
     assert_approx_eq!(Number(2.42), setup.evaluate(expr));
 }
@@ -492,7 +507,7 @@ fn division_of_two_numbers() {
         token::Number(0.1),
     ];
 
-    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parse(tokens);
 
     assert_approx_eq!(Number(71.0), setup.evaluate(expr));
 }
@@ -506,7 +521,7 @@ fn remainder_of_two_numbers() {
         token::Number(3.0),
     ];
 
-    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parse(tokens);
 
     assert_approx_eq!(Number(1.1), setup.evaluate(expr));
 }
@@ -519,7 +534,7 @@ fn unary_negation() {
         token::Number(7.2),
     ];
 
-    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parse(tokens);
 
     assert_approx_eq!(Number(-7.2), setup.evaluate(expr));
 }
@@ -534,7 +549,7 @@ fn repeated_unary_negation() {
         token::Number(7.2),
     ];
 
-    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parse(tokens);
 
     assert_approx_eq!(Number(-7.2), setup.evaluate(expr));
 }
@@ -543,14 +558,14 @@ fn repeated_unary_negation() {
 fn top_level_function_call() {
     let setup = Setup::new();
     let tokens = tokens![
-      token::Function("true".to_string()),
-      token::LeftParen,
-      token::RightParen,
-  ];
+        token::Function("true".to_string()),
+        token::LeftParen,
+        token::RightParen,
+    ];
 
-  let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parse(tokens);
 
-  assert_eq!(Boolean(true), setup.evaluate(expr));
+    assert_eq!(Boolean(true), setup.evaluate(expr));
 }
 
 #[test]
@@ -566,7 +581,7 @@ fn or_expression() {
         token::RightParen,
     ];
 
-    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parse(tokens);
 
     assert_eq!(Boolean(true), setup.evaluate(expr));
 }
@@ -580,7 +595,7 @@ fn and_expression() {
         token::Number(0.0),
     ];
 
-    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parse(tokens);
 
     assert_eq!(Boolean(false), setup.evaluate(expr));
 }
@@ -594,7 +609,7 @@ fn equality_expression() {
         token::Number(1.1),
     ];
 
-    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parse(tokens);
 
     assert_eq!(Boolean(false), setup.evaluate(expr));
 }
@@ -608,7 +623,7 @@ fn inequality_expression() {
         token::Number(1.2),
     ];
 
-    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parse(tokens);
 
     assert_eq!(Boolean(false), setup.evaluate(expr));
 }
@@ -622,7 +637,7 @@ fn less_than_expression() {
         token::Number(1.2),
     ];
 
-    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parse(tokens);
 
     assert_eq!(Boolean(false), setup.evaluate(expr));
 }
@@ -636,7 +651,7 @@ fn less_than_or_equal_expression() {
         token::Number(1.2),
     ];
 
-    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parse(tokens);
 
     assert_eq!(Boolean(true), setup.evaluate(expr));
 }
@@ -650,7 +665,7 @@ fn greater_than_expression() {
         token::Number(1.2),
     ];
 
-    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parse(tokens);
 
     assert_eq!(Boolean(false), setup.evaluate(expr));
 }
@@ -664,7 +679,7 @@ fn greater_than_or_equal_expression() {
         token::Number(1.2),
     ];
 
-    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parse(tokens);
 
     assert_eq!(Boolean(true), setup.evaluate(expr));
 }
@@ -673,62 +688,61 @@ fn greater_than_or_equal_expression() {
 fn variable_reference() {
     let mut setup = Setup::new();
     let tokens = tokens![
-      token::DollarSign,
-      token::String("variable-name".to_string()),
-  ];
+        token::DollarSign,
+        token::String("variable-name".to_string()),
+    ];
 
-  setup.variables.insert("variable-name".to_string(), Number(12.3));
-  let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
+    setup.add_var("variable-name", Number(12.3));
+    let expr = setup.parse(tokens);
 
-  assert_approx_eq!(Number(12.3), setup.evaluate(expr));
+    assert_approx_eq!(Number(12.3), setup.evaluate(expr));
 }
 
-// #[test]
-// fn filter_expression)
-// {
-//   tokens.add({
-//       token::DollarSign,
-//       token::String("variable"),
-//       token::LeftBracket,
-//       token::Number(0),
-//       token::RightBracket,
-//   });
+#[test]
+fn filter_expression() {
+    let mut setup = Setup::new();
+    let tokens = tokens![
+        token::DollarSign,
+        token::String("variable".to_string()),
+        token::LeftBracket,
+        token::Number(0.0),
+        token::RightBracket,
+    ];
 
-//   Nodeset value;
-//   value.add(add_child(top_node, "first-node"));
-//   value.add(add_child(top_node, "second-node"));
-//   variables.set("variable", value);
+    let value = nodeset![
+        setup.add_child(&setup.top_node, "first-node"),
+        setup.add_child(&setup.top_node, "second-node"),
+    ];
+    setup.add_var("variable", Nodes(value));
 
-//   auto expr = parser->parse();
+    let expr = setup.parse(tokens);
 
-//   ASSERT_THAT(evaluate(expr).nodeset(), ElementsAre());
-// }
-
-// #[test]
-// fn filter_expression_and_relative_path)
-// {
-//   tokens.add({
-//       token::DollarSign,
-//       token::String("variable"),
-//       token::Slash,
-//       token::String("child"),
-//   });
-
-//   auto parent = add_child(top_node, "parent");
-//   auto child = add_child(parent, "child");
-
-//   Nodeset variable_value;
-//   variable_value.add(parent);
-//   variables.set("variable", variable_value);
-
-//   auto expr = parser->parse();
-
-//   ASSERT_THAT(evaluate(expr).nodeset(), ElementsAre(child));
-// }
+    assert_eq!(Nodes(nodeset![]), setup.evaluate(expr));
+}
 
 #[test]
-fn union_expression()
-{
+fn filter_expression_and_relative_path() {
+    let mut setup = Setup::new();
+    let tokens = tokens![
+        token::DollarSign,
+        token::String("variable".to_string()),
+        token::Slash,
+        token::String("child".to_string()),
+    ];
+
+    let parent = setup.add_child(&setup.top_node, "parent");
+    let child = setup.add_child(&parent, "child");
+
+    let value = nodeset![parent];
+    setup.add_var("variable", Nodes(value));
+
+    let expr = setup.parse(tokens);
+
+    assert_eq!(Nodes(nodeset![child]), setup.evaluate(expr));
+}
+
+#[test]
+fn union_expression() {
     let mut setup = Setup::new();
     let tokens = tokens![
         token::DollarSign,
@@ -740,71 +754,73 @@ fn union_expression()
 
     let node1 = setup.add_child(&setup.top_node, "first-node");
     let value1 = nodeset![node1.clone()];
-    setup.variables.insert("variable1".to_string(), Nodes(value1));
+    setup.add_var("variable1", Nodes(value1));
 
     let node2 = setup.add_child(&setup.top_node, "second-node");
     let value2 = nodeset![node2.clone()];
-    setup.variables.insert("variable2".to_string(), Nodes(value2));
+    setup.add_var("variable2", Nodes(value2));
 
-    let expr = setup.parser.parse(tokens.move_iter()).unwrap().unwrap();
+    let expr = setup.parse(tokens);
 
     assert_eq!(Nodes(nodeset![node1, node2]), setup.evaluate(expr));
 }
 
-// #[test]
-// fn absolute_path_expression)
-// {
-//   tokens.add({
-//       token::Slash,
-//   });
+#[test]
+fn absolute_path_expression() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::Slash,
+    ];
 
-//   auto node1 = add_child(top_node, "first-node");
-//   auto node2 = add_child(node1, "second-node");
+    let node1 = setup.add_child(&setup.top_node, "first-node");
+    let node2 = setup.add_child(&node1, "second-node");
 
-//   auto expr = parser->parse();
+    let expr = setup.parse(tokens);
 
-//   ASSERT_THAT(evaluate_on(expr, node2).nodeset(), ElementsAre(doc.root()));
-// }
+    assert_eq!(Nodes(nodeset![setup.doc.root()]), setup.evaluate_on(expr, node2));
+}
 
-// #[test]
-// fn absolute_path_with_child_expression)
-// {
-//   tokens.add({
-//       token::Slash,
-//       token::String("*"),
-//   });
+#[test]
+fn absolute_path_with_child_expression() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::Slash,
+        token::String("*".to_string()),
+    ];
 
-//   auto node1 = add_child(top_node, "first-node");
-//   auto node2 = add_child(node1, "second-node");
+    let node1 = setup.add_child(&setup.top_node, "first-node");
+    let node2 = setup.add_child(&node1, "second-node");
 
-//   auto expr = parser->parse();
+    let expr = setup.parse(tokens);
 
-//   ASSERT_THAT(evaluate_on(expr, node2).nodeset(), ElementsAre(top_node));
-// }
+    assert_eq!(Nodes(nodeset![setup.top_node.clone()]), setup.evaluate_on(expr, node2));
+}
 
-// #[test]
-// fn unknown_axis_is_reported_as_an_error)
-// {
-//   tokens.add({
-//       token::Axis, "bad-axis",
-//       token::DoubleColon,
-//       token::String("*")
-//   });
+#[test]
+fn unknown_axis_is_reported_as_an_error() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::Axis("bad-axis".to_string()),
+        token::DoubleColon,
+        token::String("*".to_string())
+    ];
 
-//   ASSERT_THROW(parser->parse(), InvalidXPathAxisException);
-// }
+    let res = setup.parse_raw(tokens);
+    assert_eq!(Some(InvalidXPathAxis("bad-axis".to_string())), res.err());
+}
 
-// #[test]
-// fn unknown_node_test_is_reported_as_an_error)
-// {
-//   tokens.add({
-//       token::NodeTest, "bad-node-test",
-//       token::LeftParen,
-//       token::RightParen
-//   });
+#[test]
+fn unknown_node_test_is_reported_as_an_error() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::NodeTest("bad-node-test".to_string()),
+        token::LeftParen,
+        token::RightParen
+    ];
 
-//   ASSERT_THROW(parser->parse(), InvalidNodeTestException);
-// }
+    let res = setup.parse_raw(tokens);
+    assert_eq!(Some(InvalidNodeTest("bad-node-test".to_string())), res.err());
+}
 
 #[test]
 fn unexpected_token_is_reported_as_an_error() {
@@ -815,20 +831,20 @@ fn unexpected_token_is_reported_as_an_error() {
     ];
 
     let res = setup.parser.parse(tokens.move_iter());
-
     assert_eq!(Some(UnexpectedToken(token::RightParen)), res.err());
 }
 
-// #[test]
-// fn binary_operator_without_right_hand_side_is_reported_as_an_error)
-// {
-//   tokens.add({
-//       token::Literal, "left",
-//       token::And
-//   });
+#[test]
+fn binary_operator_without_right_hand_side_is_reported_as_an_error() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::Literal("left".to_string()),
+        token::And
+    ];
 
-//   ASSERT_THROW(parser->parse(), RightHandSideExpressionMissingException);
-// }
+    let res = setup.parse_raw(tokens);
+    assert_eq!(Some(RightHandSideExpressionMissing), res.err());
+}
 
 #[test]
 fn unary_operator_without_right_hand_side_is_reported_as_an_error() {
@@ -838,46 +854,43 @@ fn unary_operator_without_right_hand_side_is_reported_as_an_error() {
     ];
 
     let res = setup.parser.parse(tokens.move_iter());
-
     assert_eq!(Some(RightHandSideExpressionMissing), res.err());
 }
 
-// #[test]
-// fn empty_predicate_is_reported_as_an_error)
-// {
-//   tokens.add({
-//       token::String("*"),
-//       token::LeftBracket,
-//       token::RightBracket,
-//   });
+#[test]
+fn empty_predicate_is_reported_as_an_error() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::String("*".to_string()),
+        token::LeftBracket,
+        token::RightBracket,
+    ];
 
-//   ASSERT_THROW(parser->parse(), EmptyPredicateException);
-// }
+    let res = setup.parse_raw(tokens);
+    assert_eq!(Some(EmptyPredicate), res.err());
+}
 
-// #[test]
-// fn relative_path_with_trailing_slash_is_reported_as_an_error)
-// {
-//   tokens.add({
-//       token::String("*"),
-//       token::Slash,
-//   });
+#[test]
+fn relative_path_with_trailing_slash_is_reported_as_an_error() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::String("*".to_string()),
+        token::Slash,
+    ];
 
-//   ASSERT_THROW(parser->parse(), TrailingSlashException);
-// }
+    let res = setup.parse_raw(tokens);
+    assert_eq!(Some(TrailingSlash), res.err());
+}
 
-// #[test]
-// fn filter_expression_with_trailing_slash_is_reported_as_an_error)
-// {
-//   tokens.add({
-//       token::DollarSign,
-//       token::String("variable"),
-//       token::Slash,
-//   });
+#[test]
+fn filter_expression_with_trailing_slash_is_reported_as_an_error() {
+    let setup = Setup::new();
+    let tokens = tokens![
+        token::DollarSign,
+        token::String("variable".to_string()),
+        token::Slash,
+    ];
 
-//   ASSERT_THROW(parser->parse(), TrailingSlashException);
-// }
-
-// int main(int argc, char **argv) {
-//   ::testing::InitGoogleTest(&argc, argv);
-//   return RUN_ALL_TESTS();
-// }
+    let res = setup.parse_raw(tokens);
+    assert_eq!(Some(TrailingSlash), res.err());
+}

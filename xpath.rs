@@ -90,7 +90,8 @@ impl<'a> XPathEvaluationContext<'a> {
         }
     }
 
-    pub fn next<A: ToAny>(& mut self, _node: A) {
+    pub fn next<A: ToAny>(& mut self, node: A) {
+        self.node = node.to_any();
         self.position += 1;
     }
 

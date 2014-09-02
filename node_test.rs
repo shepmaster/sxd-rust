@@ -7,6 +7,8 @@ pub trait XPathNodeTest {
     fn test(&self, context: &XPathEvaluationContext, result: &mut Nodeset);
 }
 
+pub type SubNodeTest = Box<XPathNodeTest + 'static>;
+
 pub struct NodeTestAttribute {
     pub name: String,
 }

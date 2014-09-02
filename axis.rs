@@ -21,10 +21,12 @@ pub trait XPathAxis {
                     result:    &mut Nodeset);
 
     /// Describes what node type is naturally selected by this axis.
-    fn principal_node_type() -> PrincipalNodeType {
+    fn principal_node_type(&self) -> PrincipalNodeType {
         Element
     }
 }
+
+pub type SubAxis = Box<XPathAxis + 'static>;
 
 pub struct AxisAttribute;
 
@@ -48,7 +50,7 @@ impl XPathAxis for AxisAttribute {
         }
     }
 
-    fn principal_node_type() -> PrincipalNodeType {
+    fn principal_node_type(&self) -> PrincipalNodeType {
         Attribute
     }
 }
@@ -94,6 +96,10 @@ impl XPathAxis for AxisDescendant {
 
 pub struct AxisDescendantOrSelf {
     descendant: AxisDescendant,
+}
+
+impl AxisDescendantOrSelf {
+    pub fn new() -> SubAxis { box AxisDescendantOrSelf{descendant: AxisDescendant} }
 }
 
 impl XPathAxis for AxisDescendantOrSelf {
