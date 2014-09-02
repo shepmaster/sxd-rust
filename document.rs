@@ -170,13 +170,6 @@ impl Root {
         let inner = self.inner.borrow();
         inner.children.clone()
     }
-
-    fn each_child(&self, f: |&RootChild|) {
-        let inner = self.inner.borrow();
-        for child in inner.children.iter() {
-            f(child);
-        }
-    }
 }
 
 impl PartialEq for Root {
@@ -518,13 +511,6 @@ impl Element {
     pub fn children(&self) -> Vec<ElementChild> {
         let inner = self.inner.borrow();
         inner.children.clone()
-    }
-
-    pub fn each_child(&self, f: |&ElementChild|) {
-        let inner = self.inner.borrow();
-        for child in inner.children.iter() {
-            f(child);
-        }
     }
 
     pub fn set_attribute(&self, name: String, value: String) -> Attribute {
