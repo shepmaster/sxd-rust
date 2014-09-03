@@ -41,6 +41,9 @@ libxpath.rlib: $(LIBXPATH_SOURCE) libdocument.rlib
 document: document.rs
 	rustc -g --crate-type=lib --test document.rs
 
+evaluate: evaluate.rs libdocument.rlib libxpath.rlib
+	rustc -g -L . evaluate.rs
+
 # Need to include library in dependency
 xpath-tokenizer-test: xpath-tokenizer-test.rs libxpath.rlib
 	rustc -g -L . --test xpath-tokenizer-test.rs

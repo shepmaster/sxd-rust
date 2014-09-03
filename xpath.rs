@@ -3,9 +3,21 @@
 
 extern crate document;
 
+use std::collections::HashMap;
+
 use document::{Any,ToAny};
 use document::{Nodeset};
-use std::collections::HashMap;
+
+use tokenizer::{XPathTokenizer,XPathTokenDeabbreviator,XPathTokenDisambiguator};
+use parser::XPathParser;
+
+pub mod axis;
+pub mod expression;
+pub mod function;
+pub mod node_test;
+pub mod parser;
+pub mod token;
+pub mod tokenizer;
 
 #[deriving(PartialEq,Show,Clone)]
 pub enum XPathValue {
@@ -108,10 +120,20 @@ impl<'a> XPathEvaluationContext<'a> {
     }
 }
 
-pub mod axis;
-pub mod expression;
-pub mod function;
-pub mod node_test;
-pub mod parser;
-pub mod token;
-pub mod tokenizer;
+pub struct XPathFactory {
+    parser: XPathParser,
+}
+
+impl XPathFactory {
+    pub fn new() -> XPathFactory {
+        XPathFactory { parser: XPathParser::new() }
+    }
+
+    pub fn build(&self, xpath: &str) -> parser::ParseResult {
+        let tokenizer = XPathTokenizer::new(xpath);
+        let deabbreviator = XPathTokenDeabbreviator::new(tokenizer);
+        let disambiguator = XPathTokenDisambiguator::new(deabbreviator);
+
+        self.parser.parse(disambiguator)
+    }
+}
