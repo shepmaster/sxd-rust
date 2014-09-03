@@ -894,3 +894,33 @@ fn filter_expression_with_trailing_slash_is_reported_as_an_error() {
     let res = setup.parse_raw(tokens);
     assert_eq!(Some(TrailingSlash), res.err());
 }
+
+#[test]
+fn running_out_of_input_is_reported_as_an_error() {
+    let setup = Setup::new();
+    let tokens = tokens![token::Function("func".to_string())];
+
+    let res = setup.parse_raw(tokens);
+    assert_eq!(Some(RanOutOfInput), res.err());
+}
+
+#[test]
+fn having_extra_tokens_is_reported_as_an_error() {
+    let setup = Setup::new();
+    let tokens = tokens![token::LeftBracket];
+
+    let res = setup.parse_raw(tokens);
+    assert_eq!(Some(ExtraUnparsedTokens), res.err());
+}
+
+#[test]
+fn a_tokenizer_error_is_reported_as_an_error() {
+    let setup = Setup::new();
+    let tokens = vec![
+        Ok(token::Function("func".to_string())),
+        Err(xpath::tokenizer::UnableToCreateToken)
+    ];
+
+    let res = setup.parse_raw(tokens);
+    assert_eq!(Some(TokenizerError(xpath::tokenizer::UnableToCreateToken)), res.err());
+}
