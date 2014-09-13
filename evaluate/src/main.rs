@@ -1,9 +1,9 @@
 extern crate document;
 extern crate xpath;
 
-use std::io::File;
-
+use std::cmp::min;
 use std::collections::hashmap::HashMap;
+use std::io::File;
 
 use document::ToAny;
 use document::parser::Parser;
@@ -11,24 +11,23 @@ use document::parser::Parser;
 use xpath::{XPathEvaluationContext,XPathFactory};
 use xpath::expression::XPathExpression;
 
+fn pretty_error(xml: &str, position: uint) -> &str {
+    let s = xml.slice_from(position);
+    let l = s.char_len();
+    s.slice_chars(0, min(l, 15))
+}
+
 fn main() {
     let mut args = std::os::args();
 
-    let filename = match args.remove(1) {
-        Some(x) => x,
-        None => { println!("File required"); return; },
-    };
-
-    let xpath_str = match args.remove(1) {
-        Some(x) => x,
-        None => { println!("XPath required"); return; },
-    };
+    let filename = args.remove(1).expect("File required");
+    let xpath_str = args.remove(1).expect("XPath required");
 
     let factory = XPathFactory::new();
 
     let expr = match factory.build(xpath_str.as_slice()) {
-        Err(x) => { println!("Unable to compile XPath: {}", x); return; },
-        Ok(None) => { println!("Unable to compile XPath"); return; },
+        Err(x) => fail!("Unable to compile XPath: {}", x),
+        Ok(None) => fail!("Unable to compile XPath"),
         Ok(Some(x)) => x,
     };
 
@@ -38,13 +37,19 @@ fn main() {
     let mut file = File::open(&path);
 
     let data = match file.read_to_end() {
-        Ok(x) => String::from_utf8(x),
-        Err(x) => { println!("Can't read: {}", x); return; },
+        Ok(x) => x,
+        Err(x) => fail!("Can't read: {}", x),
     };
 
-    let data = data.ok().expect("Unable to convert to UTF-8");
+    let data = match String::from_utf8(data) {
+        Ok(x) => x,
+        Err(x) => fail!("Unable to convert to UTF-8: {}", x),
+    };
 
-    let d = p.parse(data.as_slice());
+    let d = match p.parse(data.as_slice()) {
+        Ok(d) => d,
+        Err(point) => fail!("Unable to parse: {}", pretty_error(data.as_slice(), point)),
+    };
 
     let mut functions = HashMap::new();
     xpath::function::register_core_functions(& mut functions);
